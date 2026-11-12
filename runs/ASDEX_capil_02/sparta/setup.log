@@ -1,0 +1,10 @@
+case ASDEX_capil_02: He, D = 0.4 mm
+domain x = [1.6, 50] mm (coupling plane at 4 D), r = [0, 25] mm
+grid: 29228 cells over 6 levels (L1:19822, L2:375, L3:652, L4:1650, L5:3805, L6:2924)
+  cell size 7.56 um (finest) to 242 um (base)
+  mean free path in domain 28.7 um to 177 mm
+fnum     1.31e+17
+  particles/cell: refined cells median 26.2, 10th pct 20; all cells min 0.0182
+  steady-state particles ~ 2.65e+05
+timestep 1.87e-09 s
+axis Kn_GLL at coupling plane: 0.0359 (continuum breaks down at x ~ 5.7 D)

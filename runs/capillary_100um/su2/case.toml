@@ -1,0 +1,39 @@
+[case]
+name = "capillary_100um"
+
+[geometry]
+noz_type = "capillary"
+throat_diam_mm = 0.4
+throat_length_mm = 66
+
+dim = 2
+symmetry = "axial"
+chamb_length_cm = 5
+chamb_height_cm = 2.5
+
+[gas]
+species_file = "he.species"
+plen_pres_pa = 5.0e4
+plen_temp_K = 300.15
+
+[su2]
+# Continuum domain only needs to reach a bit past the coupling plane;
+# the far plume is DSMC territory. Sizes are in throat diameters.
+ext_length_D = 20
+ext_radius_D = 10
+back_pres_pa = 1.0        # SU2 cannot do p=0; outlet is supersonic over most of it anyway
+wall_temp_K = 300.15
+faceplate = "wall"        # "wall" (isothermal) or "sym" (slip, no exit-plane wall)
+# mesh (quads, structured blocks); grading solved so the first cell = first_cell_um
+first_cell_um = 1.0       # cell size at tube wall, exit plane and lip
+n_radial_tube = 40        # cells across tube radius, clustered to wall
+n_axial_tube = 400        # cells along tube, clustered at exit
+n_axial_ext = 160         # cells downstream of exit, clustered at exit
+n_radial_ext = 80         # cells from lip to outer radius, clustered at lip
+iterations = 20000
+nprocs = 8
+
+[params]
+timestep_s = 1.0e-8
+fnum = 1.0e12
+base_grid = [200,100,100]

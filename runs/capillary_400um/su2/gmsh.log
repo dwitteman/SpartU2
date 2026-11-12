@@ -1,0 +1,26 @@
+Info    : Running 'gmsh runs/capillary_400um/su2/mesh.geo -2 -format su2 -o runs/capillary_400um/su2/mesh.su2' [Gmsh 4.14.0-git, 1 node, max. 1 thread]
+Info    : Started on Thu Oct 29 13:09:55 2026
+Info    : Reading 'runs/capillary_400um/su2/mesh.geo'...
+Info    : Done reading 'runs/capillary_400um/su2/mesh.geo'
+Info    : Meshing 1D...
+Info    : [  0%] Meshing curve 1 (Line)
+Info    : [ 20%] Meshing curve 2 (Line)
+Info    : [ 30%] Meshing curve 3 (Line)
+Info    : [ 40%] Meshing curve 4 (Line)
+Info    : [ 50%] Meshing curve 5 (Line)
+Info    : [ 60%] Meshing curve 6 (Line)
+Info    : [ 70%] Meshing curve 7 (Line)
+Info    : [ 80%] Meshing curve 8 (Line)
+Info    : [ 90%] Meshing curve 9 (Line)
+Info    : [100%] Meshing curve 10 (Line)
+Info    : Done meshing 1D (Wall 0.00582423s, CPU 0.000459s)
+Info    : Meshing 2D...
+Info    : [  0%] Meshing surface 1 (Transfinite)
+Info    : [ 40%] Meshing surface 2 (Transfinite)
+Info    : [ 70%] Meshing surface 3 (Transfinite)
+Info    : Done meshing 2D (Wall 0.00429375s, CPU 9.9e-05s)
+Info    : 35881 nodes 36768 elements
+Info    : Writing 'runs/capillary_400um/su2/mesh.su2'...
+Info    : Writing 35200 elements and 35881 nodes
+Info    : Done writing 'runs/capillary_400um/su2/mesh.su2'
+Info    : Stopped on Thu Oct 29 13:09:55 2026 (From start: Wall 0.0490019s, CPU 0.042407s)

@@ -1,0 +1,11 @@
+# VSS collision model parameters for each species
+
+# diameter (m)
+# omega
+# tref
+# alpha
+
+# D2: same interaction potential as H2, so Bird's (1994) H2 VSS parameters apply; the
+# viscosity scales with sqrt(mass). Gives mu(293 K) = 1.26e-5 Pa s, matching measured D2.
+
+D2   2.88e-10 0.67  273.15  1.35

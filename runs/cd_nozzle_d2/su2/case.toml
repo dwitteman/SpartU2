@@ -1,0 +1,49 @@
+# Example case: conical converging-diverging nozzle, deuterium, into the 5 x 2.5 cm chamber.
+# The nozzle dimensions are illustrative; replace them with the real nozzle.
+#   python su2/setup.py examples/cd_nozzle_d2.toml
+
+[case]
+name = "cd_nozzle_d2"
+
+[geometry]
+noz_type = "cd_nozzle"
+throat_diam_mm = 0.5          # D_t; lengths "in D" elsewhere (e.g. x_couple_D) use this
+inlet_diam_mm = 3.0           # start of the converging cone (inlet boundary)
+exit_diam_mm = 2.0            # A_e/A_t = 16
+conv_half_angle_deg = 30
+div_half_angle_deg = 15
+throat_rc_D = 1.0             # radius of the arcs blending the cones into the throat, in D_t
+throat_length_mm = 0.0        # optional straight throat section
+
+dim = 2
+symmetry = "axial"
+chamb_length_cm = 5
+chamb_height_cm = 2.5
+
+[gas]
+species_file = "d2.species"
+plen_pres_pa = 1.0e5
+plen_temp_K = 300.15
+
+[su2]
+back_pres_pa = 0.1
+wall_temp_K = 300.15
+faceplate = "wall"
+first_cell_um = 1.0           # cell size at the wall, exit plane and lip
+throat_cell_um = 10.0         # axial cell size at the throat (default R_t/20)
+n_radial_tube = 40            # cells from wall to axis inside the nozzle
+n_axial_conv = 120            # inlet -> throat, clustered at the throat
+n_axial_div = 200             # throat -> exit, split in two blocks clustered at each end
+n_axial_ext = 300             # exit plane -> outlet
+n_radial_ext = 200            # lip -> chamber radius
+iterations = 15000
+nprocs = 20
+
+[sparta]
+x_couple_D = 10               # in throat diameters (here 5 mm = 2.5 exit diameters)
+base_grid = [200, 100]
+cells_per_mfp = 3
+ppc_target = 20
+fnum = "auto"
+timestep_s = "auto"
+nprocs = 20

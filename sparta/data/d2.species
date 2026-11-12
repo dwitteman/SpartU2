@@ -1,0 +1,21 @@
+# Species data
+
+# ID
+# Molwt (amu)
+# Molmass (kg)
+# Rotational dof
+# RotRel
+# Vibrational dof
+# VibRel
+# VibTemp (K)
+# species wt
+# charge
+
+# RotRel and VibRel are relaxation PROBABILITIES per collision (1/Z): SPARTA relaxes a
+# mode when rotrel >= uniform random number (collide_vss.cpp).
+# D2: rotation active above ~43 K (theta_rot). RotRel 0.2 (Z_rot = 5) is a PLACEHOLDER,
+# the usual DSMC default - measured D2 Z_rot is larger and temperature dependent; check
+# before production runs. VibRel 0.02 (Z_vib = 50) is also nominal; vibration
+# (theta_v = 4482 K, from omega_e = 3115.5 cm-1) is effectively frozen below ~500 K.
+
+D2  4.0282    6.6890E-27  2    0.2   2   0.02    4482.0  1.0      0.0

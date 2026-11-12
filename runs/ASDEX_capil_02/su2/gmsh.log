@@ -1,0 +1,26 @@
+Info    : Running 'gmsh runs/ASDEX_capil_02/su2/mesh.geo -2 -format su2 -o runs/ASDEX_capil_02/su2/mesh.su2' [Gmsh 4.14.0-git, 1 node, max. 1 thread]
+Info    : Started on Tue Nov 10 14:44:07 2026
+Info    : Reading 'runs/ASDEX_capil_02/su2/mesh.geo'...
+Info    : Done reading 'runs/ASDEX_capil_02/su2/mesh.geo'
+Info    : Meshing 1D...
+Info    : [  0%] Meshing curve 1 (Line)
+Info    : [ 20%] Meshing curve 2 (Line)
+Info    : [ 30%] Meshing curve 3 (Line)
+Info    : [ 40%] Meshing curve 4 (Line)
+Info    : [ 50%] Meshing curve 5 (Line)
+Info    : [ 60%] Meshing curve 6 (Line)
+Info    : [ 70%] Meshing curve 7 (Line)
+Info    : [ 80%] Meshing curve 8 (Line)
+Info    : [ 90%] Meshing curve 9 (Line)
+Info    : [100%] Meshing curve 10 (Line)
+Info    : Done meshing 1D (Wall 0.0106971s, CPU 0.007351s)
+Info    : Meshing 2D...
+Info    : [  0%] Meshing surface 1 (Transfinite)
+Info    : [ 40%] Meshing surface 2 (Transfinite)
+Info    : [ 70%] Meshing surface 3 (Transfinite)
+Info    : Done meshing 2D (Wall 0.013685s, CPU 0.004561s)
+Info    : 105341 nodes 107028 elements
+Info    : Writing 'runs/ASDEX_capil_02/su2/mesh.su2'...
+Info    : Writing 104000 elements and 105341 nodes
+Info    : Done writing 'runs/ASDEX_capil_02/su2/mesh.su2'
+Info    : Stopped on Tue Nov 10 14:44:07 2026 (From start: Wall 0.141545s, CPU 0.129092s)
