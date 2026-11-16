@@ -26,21 +26,31 @@ This does four things:
 
 ### Restarting
 
-Setup always writes `RESTART_SOL= NO`, and takes `ITER` from `[su2] iterations`. There is no
-restart option in the case file yet. To continue an unconverged run from its
-`restart_flow.dat`:
+To continue an unconverged run from its `restart_flow.dat`:
 
-1. In `runs/<name>/su2/su2.cfg`, set `RESTART_SOL= YES` and raise `ITER` if needed.
-2. Run `python su2/run.py runs/<name>/su2` again.
-3. Don't run setup again in between, or it will undo these edits.
+```bash
+python su2/run.py runs/<name>/su2 --restart --iter 20000   # 20000 more iterations
+```
 
-`su2.log` is overwritten on each run. Each restart begins counting iterations from 0 again.
+- **What `run.py` changes:** it sets `RESTART_SOL` and `ITER` in `su2.cfg` itself. Without
+  `--restart` it sets `RESTART_SOL= NO`, so a plain run always starts from the initial
+  state, whatever an earlier restart left in `su2.cfg`.
+- **Archive:** before a restart, the current `flow.vtu`, `history.csv`, `su2.log`,
+  `restart_flow.dat` and `su2.cfg` are copied to `archive/<n>/`. You can compare the new
+  solution with the old one, or go back.
+- **Iteration count:** SU2 counts iterations from 0 again after a restart, so `--iter` is the
+  number for this run, not a total.
+- **Don't run setup between restarts:** it remeshes, so the restart file no longer fits.
+
+From Python (for example in `runnit.py`): `su2_run(run_dir, restart=True, iterations=20000)`;
+see the [main README](../README.md#from-python).
 
 ## Run
 
 ```bash
 python su2/run.py runs/<name>/su2           # MPI ranks default to [su2] nprocs
 python su2/run.py runs/<name>/su2 -n 8
+python su2/run.py runs/<name>/su2 --restart --iter 20000   # continue; see Restarting
 ```
 
 SU2's output appears on screen and is also saved to `su2.log`. Ctrl-C stops the MPI job.

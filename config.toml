@@ -8,8 +8,8 @@ throat_length_mm = 66
 
 dim = 2
 symmetry = "axial"
-chamb_length_cm = 5
-chamb_height_cm = 2.5
+chamb_length_cm = 1
+chamb_height_cm = .5
 
 [gas]
 species_file = "he.species"
@@ -39,6 +39,9 @@ x_couple_D = 4            # coupling plane, throat diameters downstream of the e
 base_grid = [200, 100]    # level-1 cells (x, r); refined 2x2 per level from the SU2 field
 cells_per_mfp = 3         # refine until cell size <= local mean free path / this
 ppc_target = 20           # particles per refined cell used to choose fnum
+trans_iter = 25,000       # hold time before calculations start
+adapt_mesh = true         # Refine mesh after transient period
+iter_tot = 50,000         # total interation count
 fnum = "auto"             # or a number (was 1.0e12); auto = from ppc_target
 timestep_s = "auto"       # or a number (was 1.0e-8); auto = min(0.2 tau_coll, 0.5 cell transit)
 nprocs = 20

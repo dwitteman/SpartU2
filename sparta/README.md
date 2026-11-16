@@ -39,8 +39,20 @@ way to plot the grid.
 ## Run
 
 ```bash
-cd runs/<name>/sparta && mpirun -n N spa_mpi -in in.sparta   # -> log.sparta, flow.<step>.dump
+python sparta/run.py runs/<name>/sparta            # ranks from [sparta] nprocs -> sparta.log, flow.<step>.dump
+python sparta/run.py runs/<name>/sparta -n 4 --max-mem-gb 4
+python sparta/run.py runs/<name>/sparta -n 1 --input in.grid   # just load the grid
 ```
+
+`run.py` has two memory guards, so a run can't exhaust RAM and take WSL down:
+- **Before the run:** it refuses to start if the particle estimate in `setup.log` (about
+  200 B per particle) exceeds the limit. Pass `--force` to override.
+- **During the run:** it checks the total resident memory of all SPARTA ranks every second,
+  and kills them all if it goes over the limit.
+
+The limit is `--max-mem-gb`, or `[sparta] max_mem_gb`, or else half the machine's RAM.
+Binaries come from `SPA_MPI`/`SPA_SERIAL`, then `PATH`, then
+`~/code/sparta-24Sep2025/src`.
 
 > **Check `setup.log` first.** The steady-state particle count and memory estimate are
 > printed there. The estimate assumes the DSMC density matches SU2's. If SU2's chamber
@@ -55,6 +67,82 @@ cd runs/<name>/sparta && mpirun -n N spa_mpi -in in.sparta   # -> log.sparta, fl
   path for comparison.
 - **Load balance:** rebalances every `run_steps`/20 steps.
 
+### Transient hold and grid adaptation
+
+With `hold_steps` set (for example 25000), `in.sparta` runs in three phases:
+
+1. **Hold:** `hold_steps` steps from an empty box with no averaging or dumps, so the jet can
+   fill the domain. Stats and restart files are still written. During the last
+   `adapt_window` steps (default 1000), the particle count in each cell is averaged.
+2. **Adapt:** a single `adapt_grid` based on that averaged count. A restart file is written
+   afterwards.
+   - **Refine:** cells holding more than `adapt_refine_count` particles (default
+     4 × `ppc_target`) are split 2×2.
+   - **Coarsen:** groups of 4 sibling cells holding fewer than `adapt_coarsen_count`
+     in total (default `ppc_target`) are merged.
+   - **Rebalance:** the grid is then rebalanced across processes (`balance_grid rcb part`).
+3. **Run:** `run_steps` more steps with averaged output every `output_every` steps.
+
+The total length is `hold_steps` + `run_steps`.
+
+`output_every` is counted from step 0, so with a hold it must divide both `hold_steps` and
+`run_steps`. That way every averaged block, including the last, is written. By default it
+is their greatest common divisor, for example 5000 for a 25000-step hold and a 10000-step run.
+
+Limits of the adaptation:
+- **Refinement depth:** refinement can't go deeper than the 32-bit cell-ID limit. A
+  200×100 base grid with 6 levels is already there, so cells at the finest level stay as
+  they are. In practice you mainly get:
+  - empty background regions coarsened;
+  - coarse cells that the plume has filled refined.
+
+  To refine further, use a coarser `base_grid` or build SPARTA with 64-bit cell IDs (see Grid).
+- **SU2 columns:** new cells get 0 in the SU2 columns of the dump (`g_su2_nrho`, `g_lambda`).
+- **Weights:** particle weights are recomputed for new cells. Particles already in a split
+  cell keep their weight until they move, which settles within a few steps.
+- **Continuations:** `in.continue` doesn't repeat the hold or the adaptation. Continue from a
+  restart written after it (the one at the end of the hold, or later).
+- **Set `adapt = false`** to keep the hold without adapting.
+
+Check in `log.sparta` after the hold:
+- the `adapt_grid` summary (cells refined and coarsened, and the new cell count);
+- that the particle count had levelled off before the hold ended.
+
+### Continuing a run
+
+`in.sparta` writes a restart file `restart.<step>.sparta` every `restart_every` steps and
+at the end. `in.continue` picks up from the latest one and runs up to an absolute timestep:
+
+```bash
+python sparta/run.py runs/<name>/sparta --restart --target 30000   # memory-guarded, picks a new seed
+mpirun -n N spa_mpi -in in.continue -var target 30000              # by hand
+mpirun -n N spa_mpi -in in.continue -var target 50000 -var seed 777  # by hand, new seed
+```
+
+Without `--target`, `run.py --restart` runs `run_steps` past the latest restart.
+
+**Continuing after SU2 has changed:** `in.continue` reads `inflow.sparta` fresh, so you can
+update the inflow and continue the DSMC rather than starting from an empty box. Restart or
+rerun SU2, run `sparta/setup.py` to rewrite `inflow.sparta`, then `run.py --restart`
+(from Python: `su2_run(d, restart=True, iterations=...)`, `sparta_setup(case)`, then
+`sparta_run(s, restart=True, target=...)`). The DSMC keeps the grid from
+its restart file. A new grid only takes effect in a fresh run (`--sparta new`).
+
+- **What carries over:** the restart file holds the grid, particles, species, mixture, global
+  settings (fnum, weight, gridcut), timestep size and step number.
+- **What `in.continue` redefines:** the collision model, the inflow and all output, with the
+  same settings as `in.sparta`.
+- **Process count:** it works with a different number of processes; `balance rcb cell`
+  regroups the cells on reading.
+- **Averages restart:** the `fix ave/grid` averages start again. The first dump after
+  continuing comes at the next multiple of `output_every`.
+- **First step:** `in.continue` takes one step before defining the dump. SPARTA always dumps on
+  the first step of a run when it falls on a multiple of the dump interval, which would
+  overwrite the last `flow.<step>.dump` with an empty average.
+- **Disk:** each restart file is roughly 100 bytes per particle plus about 100 per cell, so
+  several hundred MB for the N₂ nozzle. Delete old ones; `read_restart` only needs the latest.
+- **Not portable:** restart files are binary. Continue on the same kind of machine.
+
 The default `run_steps = 1000` is a smoke test. Steady state needs at least a few box
 transits. `setup.log` gives the number of steps for one transit at the fastest inflow speed;
 for large chambers it is tens of thousands.
@@ -66,7 +154,8 @@ for large chambers it is tens of thousands.
 | `grid.sparta` | grid file for `read_grid`, with two extra columns: SU2 mean free path `lambda` and number density `su2_nrho` |
 | `in.grid` | a small SPARTA input that loads the domain and grid and dumps them; there is no flow |
 | `inflow.sparta` | the SU2 state on the coupling plane, as a `fix emit/face/file` table |
-| `in.sparta` | the coupled DSMC run: grid, gas, inflow, averaging and dump |
+| `in.sparta` | the coupled DSMC run: grid, gas, inflow, averaging, dumps and restart files |
+| `in.continue` | continues from the latest `restart.<step>.sparta` up to `-var target <step>` |
 | `<gas>.species`, `<gas>.vss` | copied from `sparta/data/` |
 | `setup.log` | setup summary and warnings |
 | `case.toml` | copy of the case file |
@@ -203,8 +292,17 @@ timestep_s = "auto"            # or a number; optional
 # max_levels = 5               # optional cap below the cell-ID bit limit
 # max_particles = 5e6          # cap on steady-state particles for the automatic fnum (~200 B each); optional
 # run_steps = 1000             # steps in in.sparta; optional
-# average_steps = 500          # average over the last this many steps; optional, default run_steps/2
-nprocs = 20                    # not used yet (for the future sparta/run.py)
+# hold_steps = 25000           # transient hold before averaging, then adapt the grid; optional, default 0
+# adapt = true                 # adapt the grid after the hold; optional
+# adapt_window = 1000          # average the particle count over the last this many hold steps; must divide hold_steps
+# adapt_refine_count = 80      # refine cells with more particles than this; optional, default 4 x ppc_target
+# adapt_coarsen_count = 20     # merge sibling cells with fewer in total; optional, default ppc_target
+# output_every = 1000          # dump the averaged flow every this many steps; optional,
+#                              # default run_steps, or gcd(hold_steps, run_steps) with a hold
+# average_steps = 500          # average over the last this many steps before each dump; optional, default output_every/2
+# restart_every = 5000         # write restart.<step>.sparta every this many steps; optional, default run_steps
+# max_mem_gb = 6               # sparta/run.py memory limit; optional, default half the RAM
+nprocs = 20                    # MPI ranks for sparta/run.py
 ```
 
 The `[case]`, `[geometry]` and `[gas]` sections are described in the
@@ -215,6 +313,7 @@ The `[case]`, `[geometry]` and `[gas]` sections are described in the
 | File | Contents |
 |---|---|
 | `setup.py` | command-line entry point: domain, grid, fnum/dt, inflow, Kn check, writes the run directory |
+| `run.py` | runs SPARTA under mpirun with the memory guards; output tee'd to `sparta.log` |
 | `inflow.py` | samples SU2 on the coupling plane, writes the `fix emit/face/file` table, Maxwellian fluxes |
 | `grid.py` | refinement (`build`), SPARTA cell IDs, `read_grid` file writer |
 | `gas.py` | reads `.species`/`.vss` files; VSS mean free path, viscosity and mean thermal speed |

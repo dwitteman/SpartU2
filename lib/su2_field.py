@@ -29,6 +29,10 @@ def read_vtu(path) -> dict:
     arrays = {}
     for typ, name, ncomp, offset in _ARRAY.findall(raw[:start]):
         pos = data + int(offset)
+        if pos + 8 > len(raw) or pos + 8 + int(np.frombuffer(raw, "<u8", 1, pos)[0]) > len(raw):
+            die(f"{path} is truncated ({len(raw)} bytes): SU2 was probably stopped while "
+                f"writing it. Rewrite it from restart_flow.dat with one SU2 iteration "
+                f"(RESTART_SOL= YES, ITER= 1).")
         nbytes = int(np.frombuffer(raw, "<u8", 1, pos)[0])
         a = np.frombuffer(raw, _DTYPES[typ.decode()], nbytes // np.dtype(_DTYPES[typ.decode()]).itemsize,
                           pos + 8)

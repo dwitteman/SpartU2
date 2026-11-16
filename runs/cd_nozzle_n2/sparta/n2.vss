@@ -1,0 +1,11 @@
+# VSS collision model parameters for each species
+
+# diameter (m)
+# omega
+# tref
+# alpha
+
+# N2: Bird (1994) Table A1 VSS. Gives mu(273 K) = 1.659e-5 Pa s and mu(300 K) = 1.779e-5,
+# within ~2% of measured N2 at 200-400 K (the power law is ~13% high at 100 K).
+
+N2   4.11e-10 0.74  273.15  1.36

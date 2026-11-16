@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# SPARTA outputs (large; regenerate with sparta/setup.py or by rerunning)
+runs/**/restart.*.sparta
+runs/**/flow.*.dump
+runs/**/grid.sparta
+runs/**/*.ppm
+runs/**/plots/
+
+# SU2 run archives and backups
+runs/**/archive/
+*.bak

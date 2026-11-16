@@ -22,6 +22,9 @@ for example `from handoff import breakdown_gll` or `from sparta.gas import Gas`.
 | `test_cd_nozzle.py` | `su2/geom/cd_nozzle.py`: wall profile (ends, throat, smoothness, cone angles, bad input) and gmsh mesh (cell counts, boundary markers, cell validity and skew, wall nodes on the profile, first wall cell); also that the capillary mesh still builds |
 | `test_gases.py` | each SU2 gas has SPARTA data with matching IDs; R matches the molecular mass; SU2 viscosity matches VSS (he/ar near room temperature, d2 over 20–400 K, n2 over 50–400 K); D2 and N2 against measured viscosity; RotRel/VibRel are probabilities (1/Z) |
 | `test_capillary_massflow.py` | `lib/capillary.py` analytical capillary flow, and SU2 capillary mass flow against it |
+| `test_sparta_run.py` | `sparta/run.py` memory guards, using small Python child processes (never SPARTA); finding the latest restart file |
+| `test_sparta_inputs.py` | `sparta/setup.py` input generation: the hold, grid adaptation and averaging in the right order; continuation input (string checks, never runs SPARTA) |
+| `test_su2_run.py` | `su2/run.py` restart handling: `su2.cfg` edits and archiving (never runs SU2) |
 | `test_inflow.py` | `sparta/inflow.py`: Maxwellian fluxes, plane mass flows, inflow file format; one opt-in test runs SPARTA on the inflow |
 | `plot_test_breakdown_gll.py` | not a test; one diagnostic plot per test in `test_breakdown_gll.py` |
 | `plots/` | output of the plot script |

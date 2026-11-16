@@ -1,0 +1,511 @@
+[puff:41943] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41931] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41923] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41940] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41924] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41932] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41929] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41928] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41925] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41942] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41939] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41926] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41944] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41945] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41938] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41933] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41927] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41936] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41937] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41930] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+
+-------------------------------------------------------------------------
+|    ___ _   _ ___                                                      |
+|   / __| | | |_  )   Release 8.5.0 "Harrier"                           |
+|   \__ \ |_| |/ /                                                      |
+|   |___/\___//___|   Suite (Computational Fluid Dynamics Code)         |
+|                                                                       |
+-------------------------------------------------------------------------
+| SU2 Project Website: https://su2code.github.io                        |
+|                                                                       |
+| The SU2 Project is maintained by the SU2 Foundation                   |
+| (http://su2foundation.org)                                            |
+-------------------------------------------------------------------------
+| Copyright 2012-2026, SU2 Contributors                                 |
+|                                                                       |
+| SU2 is free software; you can redistribute it and/or                  |
+| modify it under the terms of the GNU Lesser General Public            |
+| License as published by the Free Software Foundation; either          |
+| version 2.1 of the License, or (at your option) any later version.    |
+|                                                                       |
+| SU2 is distributed in the hope that it will be useful,                |
+| but WITHOUT ANY WARRANTY; without even the implied warranty of        |
+| MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU      |
+| Lesser General Public License for more details.                       |
+|                                                                       |
+| You should have received a copy of the GNU Lesser General Public      |
+| License along with SU2. If not, see <http://www.gnu.org/licenses/>.   |
+-------------------------------------------------------------------------
+[puff:41943] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41927] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41923] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41930] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41929] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41940] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41928] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41925] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41938] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41924] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41936] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41931] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41937] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41942] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41939] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41932] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41933] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41944] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41945] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+[puff:41926] ../../../../../../ompi/mca/osc/ucx/osc_ucx_component.c:375  Error: OSC UCX component priority set inside component query failed 
+ 
+
+Parsing config file for zone 0
+
+----------------- Physical Case Definition ( Zone 0 ) -------------------
+Compressible Laminar Navier-Stokes' equations.
+Mach number: 0.01.
+Angle of attack (AoA): 0 deg, and angle of sideslip (AoS): 0 deg.
+Reynolds number: 0. Reference length 1.
+Reading and writing binary SU2 native restart files.
+Read flow solution from: restart_flow.dat.
+Dimensional simulation.
+The reference area is 1 m^2.
+The semi-span will be computed using the max y(3D) value.
+The reference length is 1 m.
+Reference origin for moment evaluation is (0, 0, 0).
+Surface(s) where the force coefficients are evaluated: wall, faceplate.
+
+Surface(s) plotted in the output file: wall, faceplate.
+Surface(s) to be analyzed in detail: inlet, outlet.
+Input mesh file name: mesh.su2
+
+--------------- Space Numerical Integration ( Zone 0 ) ------------------
+Roe (with entropy fix = 0.05) solver for the flow inviscid terms.
+Standard Roe without low-dissipation function.
+Second order integration in space, with slope limiter.
+Venkatakrishnan slope-limiting method, with constant: 0.05.
+The reference element size is: 1. 
+Average of gradients with correction (viscous flow terms).
+Gradient for upwind reconstruction: inverse-distance weighted Least-Squares.
+Gradient for viscous and source terms: inverse-distance weighted Least-Squares.
+
+--------------- Time Numerical Integration  ( Zone 0 ) ------------------
+Local time stepping (steady state simulation).
+Euler implicit method for the flow equations.
+FGMRES is used for solving the linear system.
+Using a ILU(0) preconditioning.
+Convergence criteria of the linear solver: 0.0001.
+Max number of linear iterations: 20.
+CFL adaptation. Factor down: 0.5, factor up: 1.2,
+                lower limit: 0.5, upper limit: 100,
+                acceptable linear residual: 0.001'
+                starting iteration: 0.
+Courant-Friedrichs-Lewy number:        1
+
+------------------ Convergence Criteria  ( Zone 0 ) ---------------------
+Maximum number of solver subiterations: 20000.
+Begin convergence monitoring at iteration 100.
+Residual minimum value: 1e-10.
+Cauchy series min. value: 1e-10.
+Number of Cauchy elements: 100.
+Begin windowed time average at iteration 0.
+
+-------------------- Output Information ( Zone 0 ) ----------------------
+File writing frequency: 
++------------------------------------+
+|                     File| Frequency|
++------------------------------------+
+|                  RESTART|       500|
+|                 PARAVIEW|       500|
+|              SURFACE_CSV|       500|
++------------------------------------+
+Writing the convergence history file every 1 inner iterations.
+Writing the screen convergence history every 50 inner iterations.
+The tabular file format is CSV (.csv).
+Convergence history file name: history.
+Forces breakdown file name: forces_breakdown.dat.
+Surface file name: surface_flow.
+Volume file name: flow.
+Restart file name: restart_flow.dat.
+
+------------- Config File Boundary Information ( Zone 0 ) ---------------
++-----------------------------------------------------------------------+
+|                        Marker Type|                        Marker Name|
++-----------------------------------------------------------------------+
+|                     Symmetry plane|                               axis|
++-----------------------------------------------------------------------+
+|                     Inlet boundary|                              inlet|
++-----------------------------------------------------------------------+
+|                    Outlet boundary|                             outlet|
++-----------------------------------------------------------------------+
+|                    Isothermal wall|                               wall|
+|                                   |                          faceplate|
++-----------------------------------------------------------------------+
+
+-------------------- Output Preprocessing ( Zone 0 ) --------------------
+Screen output fields: INNER_ITER, ITER_TIME, WALL_TIME, RMS_DENSITY, RMS_ENERGY, AVG_CFL, SURFACE_MASSFLOW
+History output group(s): ITER, RMS_RES, CFL_NUMBER, FLOW_COEFF
+Convergence field(s): RMS_DENSITY
+Warning: No (valid) fields chosen for time convergence monitoring. Time convergence monitoring inactive.
+Volume output fields: COORDINATES, SOLUTION, PRIMITIVE
+
+------------------- Geometry Preprocessing ( Zone 0 ) -------------------
+Two dimensional problem.
+91811 grid points before partitioning.
+90800 volume elements before partitioning.
+5 surface markers.
+40 boundary elements in index 0 (Marker = inlet).
+470 boundary elements in index 1 (Marker = wall).
+200 boundary elements in index 2 (Marker = faceplate).
+770 boundary elements in index 3 (Marker = axis).
+540 boundary elements in index 4 (Marker = outlet).
+Executing the partitioning functions.
+Building the graph adjacency structure.
+Calling ParMETIS... graph partitioning complete (2427 edge cuts).
+Distributing ParMETIS coloring.
+Rebalancing vertices.
+Rebalancing volume element connectivity.
+Rebalancing markers and surface elements.
+96703 vertices including ghost points. 
+93227 interior elements including halo cells. 
+93227 quadrilaterals.
+Establishing MPI communication patterns.
+Setting point connectivity.
+Renumbering points (Reverse Cuthill McKee Ordering).
+Recomputing point connectivity.
+Setting element connectivity.
+Checking the numerical grid orientation.
+All volume elements are correctly oriented.
+There has been a re-orientation of 1019 LINE surface elements.
+Identifying edges and vertices.
+Setting the control volume structure.
+Area of the computational grid: 0.00744081.
+Searching for the closest normal neighbors to the surfaces.
+Storing a mapping from global to local point index.
+Compute the surface curvature.
+Max K: 1.27576e+06. Mean K: 1281.19. Standard deviation K: 40073.8.
+Computing mesh quality statistics for the dual control volumes.
++--------------------------------------------------------------+
+|           Mesh Quality Metric|        Minimum|        Maximum|
++--------------------------------------------------------------+
+|    Orthogonality Angle (deg.)|         82.928|             90|
+|     CV Face Area Aspect Ratio|        1.00001|        3938.26|
+|           CV Sub-Volume Ratio|              1|        1.98736|
++--------------------------------------------------------------+
+Finding max control volume width.
+Communicating number of neighbors.
+Wetted area = 0.0120102 m^2.
+Area projection in the x-plane = 0.00075 m, y-plane = 0.054178 m.
+Max. coordinate in the x-direction = 0 m, y-direction = 0.06 m.
+Min. coordinate in the x-direction = -0.054178 m, y-direction = 0.00025 m.
+Computing wall distances.
+
+-------------------- Solver Preprocessing ( Zone 0 ) --------------------
+Viscous flow: Computing pressure using the ideal gas law
+based on the free-stream temperature and a density computed
+from the Reynolds number.
+Force coefficients computed using free-stream values.
+
+-- Models:
++------------------------------------------------------------------------------+
+|          Viscosity Model|        Conductivity Model|              Fluid Model|
++------------------------------------------------------------------------------+
+|               SUTHERLAND|          CONSTANT_PRANDTL|                IDEAL_GAS|
++------------------------------------------------------------------------------+
+-- Fluid properties:
++------------------------------------------------------------------------------+
+|                  Name|    Dim. value|    Ref. value|      Unit|Non-dim. value|
++------------------------------------------------------------------------------+
+|        Ref. Viscosity|    1.6616e-05|             1|   N.s/m^2|    1.6616e-05|
+|      Sutherland Temp.|        273.15|             1|         K|        273.15|
+|     Sutherland Const.|         40.75|             1|         K|         40.75|
++------------------------------------------------------------------------------+
+|        Prandtl (Lam.)|             -|             -|         -|          0.71|
+|       Prandtl (Turb.)|             -|             -|         -|           0.9|
++------------------------------------------------------------------------------+
+|          Gas Constant|         296.8|             1|  N.m/kg.K|         296.8|
+|      Spec. Heat Ratio|             -|             -|         -|           1.4|
++------------------------------------------------------------------------------+
+-- Initial and free-stream conditions:
++------------------------------------------------------------------------------+
+|                  Name|    Dim. value|    Ref. value|      Unit|Non-dim. value|
++------------------------------------------------------------------------------+
+|       Static Pressure|           0.1|             1|        Pa|           0.1|
+|               Density|   1.12253e-06|             1|    kg/m^3|   1.12253e-06|
+|           Temperature|        300.15|             1|         K|        300.15|
+|          Total Energy|        222718|             1|   m^2/s^2|        222718|
+|            Velocity-X|       3.53155|             1|       m/s|       3.53155|
+|            Velocity-Y|             0|             1|       m/s|             0|
+|    Velocity Magnitude|       3.53155|             1|       m/s|       3.53155|
++------------------------------------------------------------------------------+
+|             Viscosity|   1.76237e-05|             1|   N.s/m^2|   1.76237e-05|
+|          Conductivity|             -|             1|   W/m^2.K|             -|
++------------------------------------------------------------------------------+
+|           Mach Number|             -|             -|         -|          0.01|
+|       Reynolds Number|             -|             -|         -|       0.22494|
++------------------------------------------------------------------------------+
+Initialize Jacobian structure (Navier-Stokes). MG level: 0.
+
+------------------- Numerics Preprocessing ( Zone 0 ) -------------------
+
+----------------- Integration Preprocessing ( Zone 0 ) ------------------
+
+------------------- Iteration Preprocessing ( Zone 0 ) ------------------
+Euler/Navier-Stokes/RANS fluid iteration.
+
+------------------------------ Begin Solver -----------------------------
+
+Simulation Run using the Single-zone Driver
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|           0|    0.145427|  1.4543e-01|   -6.335051|   -0.898651|  1.2000e+00|  6.1937e-05|  8.2913e-05| -2.0976e-05|
+|          50|    0.165903|  1.8670e-01|   -6.093561|   -0.619777|  1.0000e+02|  6.2059e-05|  8.3018e-05| -2.0960e-05|
+|         100|    0.433890|  2.2225e-01|   -5.916832|   -0.433748|  5.0000e+01|  6.1955e-05|  8.2969e-05| -2.1013e-05|
+|         150|    0.141391|  1.9900e-01|   -6.371976|   -0.947687|  5.0000e-01|  6.2126e-05|  8.2854e-05| -2.0728e-05|
+|         200|    0.128557|  1.9305e-01|   -6.225415|   -0.770246|  1.0000e+02|  6.2032e-05|  8.2905e-05| -2.0873e-05|
+|         250|    0.150738|  1.9164e-01|   -6.155940|   -0.706981|  5.0000e-01|  6.1992e-05|  8.2887e-05| -2.0895e-05|
+|         300|    0.135726|  1.8128e-01|   -6.370328|   -0.945974|  5.0000e-01|  6.2159e-05|  8.2791e-05| -2.0632e-05|
+|         350|    0.185348|  1.8084e-01|   -6.310346|   -0.865933|  1.0000e+02|  6.2168e-05|  8.2980e-05| -2.0811e-05|
+|         400|    0.174103|  1.8408e-01|   -5.938711|   -0.474770|  1.2500e+01|  6.2190e-05|  8.2851e-05| -2.0661e-05|
+|         450|    0.123051|  1.8285e-01|   -6.367184|   -0.943197|  5.0000e-01|  6.2169e-05|  8.2791e-05| -2.0622e-05|
+|         500|    0.336945|  1.8161e-01|   -6.362290|   -0.935323|  1.0000e+02|  6.2172e-05|  8.2930e-05| -2.0758e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|         550|    0.231298|  1.8387e-01|   -6.094082|   -0.615749|  1.0000e+02|  6.2448e-05|  8.2896e-05| -2.0448e-05|
+|         600|    0.103536|  1.8338e-01|   -6.351068|   -0.925382|  5.0000e-01|  6.2173e-05|  8.2811e-05| -2.0638e-05|
+|         650|    0.335469|  1.8902e-01|   -6.263682|   -0.808721|  1.0000e+02|  6.2318e-05|  8.3015e-05| -2.0696e-05|
+|         700|    0.090588|  1.9073e-01|   -6.093862|   -0.644702|  1.5625e+00|  6.2193e-05|  8.2834e-05| -2.0641e-05|
+|         750|    0.112979|  1.8669e-01|   -6.357724|   -0.932895|  5.0000e-01|  6.2198e-05|  8.2791e-05| -2.0594e-05|
+|         800|    0.197317|  1.8763e-01|   -6.329543|   -0.893487|  1.0000e+02|  6.2377e-05|  8.2994e-05| -2.0617e-05|
+|         850|    0.110106|  1.8804e-01|   -6.151685|   -0.698843|  5.0000e-01|  6.2258e-05|  8.2875e-05| -2.0617e-05|
+|         900|    0.116030|  1.8503e-01|   -6.355331|   -0.930166|  5.0000e-01|  6.2267e-05|  8.2804e-05| -2.0537e-05|
+|         950|    0.142016|  1.8397e-01|   -6.335379|   -0.901919|  1.0000e+02|  6.2396e-05|  8.2954e-05| -2.0559e-05|
+|        1000|    0.129869|  1.8485e-01|   -6.195707|   -0.758414|  1.5625e+00|  6.2322e-05|  8.2855e-05| -2.0533e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|        1050|    0.143049|  1.8407e-01|   -6.350271|   -0.924122|  5.0000e-01|  6.2402e-05|  8.2795e-05| -2.0392e-05|
+|        1100|    0.233033|  1.8245e-01|   -6.283124|   -0.834443|  1.0000e+02|  6.2522e-05|  8.3000e-05| -2.0479e-05|
+|        1150|    0.205157|  1.8360e-01|   -6.136435|   -0.681613|  1.5625e+00|  6.2586e-05|  8.2974e-05| -2.0388e-05|
+|        1200|    0.120770|  1.8288e-01|   -6.340680|   -0.911586|  5.0000e-01|  6.2438e-05|  8.2785e-05| -2.0347e-05|
+|        1250|    0.217754|  1.8221e-01|   -6.283140|   -0.834110|  1.0000e+02|  6.2640e-05|  8.3044e-05| -2.0405e-05|
+|        1300|    0.092633|  1.8168e-01|   -6.187542|   -0.745360|  5.0000e-01|  6.2424e-05|  8.2840e-05| -2.0416e-05|
+|        1350|    0.128637|  1.8009e-01|   -6.351708|   -0.923573|  5.0000e-01|  6.2468e-05|  8.2791e-05| -2.0323e-05|
+|        1400|    0.166815|  1.7992e-01|   -6.306857|   -0.867785|  1.0000e+02|  6.2619e-05|  8.2946e-05| -2.0327e-05|
+|        1450|    0.127704|  1.8013e-01|   -6.155047|   -0.708678|  5.0000e-01|  6.2540e-05|  8.2880e-05| -2.0340e-05|
+|        1500|    0.155934|  1.7866e-01|   -6.363443|   -0.936499|  6.4196e+00|  6.2567e-05|  8.2817e-05| -2.0250e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|        1550|    0.185101|  1.7908e-01|   -6.043153|   -0.551163|  1.0000e+02|  6.2760e-05|  8.2927e-05| -2.0167e-05|
+|        1600|    0.104383|  1.7815e-01|   -6.336689|   -0.905745|  5.0000e-01|  6.2660e-05|  8.2826e-05| -2.0166e-05|
+|        1650|    0.124694|  1.7622e-01|   -6.366297|   -0.938261|  6.4196e+00|  6.2516e-05|  8.2753e-05| -2.0236e-05|
+|        1700|    0.209379|  1.7651e-01|   -5.826864|   -0.347376|  1.0000e+02|  6.3011e-05|  8.2916e-05| -1.9905e-05|
+|        1750|    0.040927|  1.7567e-01|   -6.336729|   -0.904006|  5.0000e-01|  6.2542e-05|  8.2790e-05| -2.0248e-05|
+|        1800|    0.153827|  1.7397e-01|   -6.373025|   -0.945484|  2.3003e+01|  6.2550e-05|  8.2713e-05| -2.0163e-05|
+|        1850|    0.182232|  1.7459e-01|   -6.027030|   -0.537011|  1.0000e+02|  6.2835e-05|  8.2851e-05| -2.0016e-05|
+|        1900|    0.092628|  1.7358e-01|   -6.326216|   -0.891079|  5.0000e-01|  6.2532e-05|  8.2875e-05| -2.0342e-05|
+|        1950|    0.137608|  1.7217e-01|   -6.376171|   -0.947970|  3.3124e+01|  6.2638e-05|  8.2762e-05| -2.0124e-05|
+|        2000|    0.171122|  1.7287e-01|   -5.880039|   -0.400192|  1.0000e+02|  6.2861e-05|  8.3013e-05| -2.0152e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|        2050|    0.104552|  1.7348e-01|   -6.326363|   -0.891966|  5.0000e-01|  6.2932e-05|  8.2869e-05| -1.9937e-05|
+|        2100|    0.213520|  1.7304e-01|   -6.373036|   -0.942423|  1.0000e+02|  6.2900e-05|  8.2955e-05| -2.0055e-05|
+|        2150|    0.127869|  1.7365e-01|   -6.206989|   -0.768780|  7.8125e-01|  6.2869e-05|  8.2899e-05| -2.0030e-05|
+|        2200|    0.124577|  1.7272e-01|   -6.374416|   -0.942701|  5.0000e-01|  6.2562e-05|  8.2747e-05| -2.0185e-05|
+|        2250|    0.102875|  1.7277e-01|   -6.371002|   -0.937500|  1.0000e+02|  6.2933e-05|  8.2942e-05| -2.0009e-05|
+|        2300|    0.091375|  1.7407e-01|   -6.201809|   -0.754588|  5.0000e-01|  6.2835e-05|  8.2790e-05| -1.9955e-05|
+|        2350|    0.060697|  1.7428e-01|   -6.378195|   -0.946392|  5.0000e-01|  6.2705e-05|  8.2768e-05| -2.0063e-05|
+|        2400|    0.156313|  1.7398e-01|   -6.380348|   -0.949282|  1.0000e+02|  6.2937e-05|  8.2867e-05| -1.9930e-05|
+|        2450|    0.173029|  1.7464e-01|   -6.164350|   -0.709569|  5.0000e-01|  6.3017e-05|  8.2828e-05| -1.9811e-05|
+|        2500|    0.125341|  1.7379e-01|   -6.381418|   -0.949387|  5.0000e-01|  6.2985e-05|  8.2791e-05| -1.9806e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|        2550|    0.217066|  1.7374e-01|   -6.371056|   -0.937369|  1.0000e+02|  6.2945e-05|  8.2805e-05| -1.9860e-05|
+|        2600|    0.133414|  1.7391e-01|   -6.208366|   -0.762463|  5.0000e-01|  6.3031e-05|  8.2892e-05| -1.9861e-05|
+|        2650|    0.180986|  1.7312e-01|   -6.377606|   -0.944445|  7.2000e-01|  6.3010e-05|  8.2817e-05| -1.9807e-05|
+|        2700|    0.193439|  1.7344e-01|   -6.105217|   -0.648426|  1.0000e+02|  6.3056e-05|  8.2903e-05| -1.9847e-05|
+|        2750|    0.150862|  1.7346e-01|   -6.242110|   -0.797693|  5.0000e-01|  6.3146e-05|  8.2871e-05| -1.9725e-05|
+|        2800|    0.174383|  1.7291e-01|   -6.374887|   -0.941261|  1.2442e+00|  6.3034e-05|  8.2764e-05| -1.9730e-05|
+|        2850|    0.224368|  1.7307e-01|   -6.130655|   -0.649204|  1.0000e+02|  6.3095e-05|  8.2839e-05| -1.9743e-05|
+|        2900|    0.131523|  1.7331e-01|   -6.247501|   -0.803615|  5.0000e-01|  6.3280e-05|  8.2974e-05| -1.9693e-05|
+|        2950|    0.117918|  1.7282e-01|   -6.372628|   -0.938639|  2.1499e+00|  6.3122e-05|  8.2809e-05| -1.9686e-05|
+|        3000|    0.204559|  1.7348e-01|   -5.955534|   -0.463753|  1.0000e+02|  6.3295e-05|  8.3042e-05| -1.9747e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|        3050|    0.153242|  1.7340e-01|   -6.307956|   -0.868901|  5.0000e-01|  6.3228e-05|  8.2829e-05| -1.9600e-05|
+|        3100|    0.047675|  1.7285e-01|   -6.373849|   -0.940368|  6.4196e+00|  6.3144e-05|  8.2733e-05| -1.9588e-05|
+|        3150|    0.184043|  1.7350e-01|   -6.061124|   -0.594573|  1.0000e+02|  6.3337e-05|  8.2881e-05| -1.9544e-05|
+|        3200|    0.124903|  1.7369e-01|   -6.348974|   -0.913324|  5.0000e-01|  6.3188e-05|  8.2804e-05| -1.9616e-05|
+|        3250|    0.138769|  1.7292e-01|   -6.372064|   -0.938679|  9.2442e+00|  6.3189e-05|  8.2729e-05| -1.9540e-05|
+|        3300|    0.344491|  1.7382e-01|   -6.121104|   -0.671904|  1.0000e+02|  6.3809e-05|  8.3038e-05| -1.9229e-05|
+|        3350|    0.234570|  1.7449e-01|   -6.255024|   -0.813448|  5.0000e-01|  6.3568e-05|  8.2808e-05| -1.9240e-05|
+|        3400|    0.150325|  1.7410e-01|   -6.371993|   -0.939444|  1.9169e+01|  6.3259e-05|  8.2714e-05| -1.9455e-05|
+|        3450|    0.332439|  1.7598e-01|   -6.153914|   -0.679224|  1.0000e+02|  6.3527e-05|  8.2947e-05| -1.9420e-05|
+|        3500|    0.111677|  1.7571e-01|   -6.334934|   -0.897180|  5.0000e-01|  6.3326e-05|  8.2797e-05| -1.9471e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|        3550|    0.177226|  1.7548e-01|   -6.371417|   -0.939950|  4.7698e+01|  6.3341e-05|  8.2772e-05| -1.9432e-05|
+|        3600|    0.199631|  1.7607e-01|   -5.946012|   -0.465605|  1.0000e+02|  6.3679e-05|  8.2974e-05| -1.9294e-05|
+|        3650|    0.134885|  1.7567e-01|   -6.361078|   -0.927884|  5.0000e-01|  6.3430e-05|  8.2787e-05| -1.9357e-05|
+|        3700|    0.208646|  1.7547e-01|   -6.358707|   -0.923444|  1.0000e+02|  6.3545e-05|  8.2944e-05| -1.9399e-05|
+|        3750|    0.203301|  1.7581e-01|   -6.005974|   -0.545494|  1.0000e+02|  6.3594e-05|  8.3011e-05| -1.9418e-05|
+|        3800|    0.160789|  1.7564e-01|   -6.351915|   -0.917187|  5.0000e-01|  6.3582e-05|  8.2810e-05| -1.9229e-05|
+|        3850|    0.199310|  1.7532e-01|   -6.361337|   -0.927953|  1.0000e+02|  6.3570e-05|  8.2940e-05| -1.9370e-05|
+|        3900|    0.173896|  1.7563e-01|   -5.883330|   -0.401313|  7.2000e+01|  6.3629e-05|  8.2900e-05| -1.9271e-05|
+|        3950|    0.137295|  1.7544e-01|   -6.351529|   -0.916939|  5.0000e-01|  6.3720e-05|  8.2848e-05| -1.9128e-05|
+|        4000|    0.131364|  1.7528e-01|   -6.267988|   -0.809540|  1.0000e+02|  6.3680e-05|  8.3002e-05| -1.9322e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|        4050|    0.138913|  1.7580e-01|   -6.186180|   -0.735954|  7.8125e-01|  6.3532e-05|  8.2824e-05| -1.9292e-05|
+|        4100|    0.111728|  1.7509e-01|   -6.360264|   -0.925867|  5.0000e-01|  6.3648e-05|  8.2753e-05| -1.9105e-05|
+|        4150|    0.177807|  1.7492e-01|   -6.324364|   -0.879467|  1.0000e+02|  6.3708e-05|  8.2969e-05| -1.9261e-05|
+|        4200|    0.164151|  1.7522e-01|   -6.185730|   -0.734306|  7.8125e-01|  6.3667e-05|  8.2871e-05| -1.9204e-05|
+|        4250|    0.122601|  1.7467e-01|   -6.357211|   -0.921949|  5.0000e-01|  6.3733e-05|  8.2800e-05| -1.9066e-05|
+|        4300|    0.366824|  1.7438e-01|   -6.277892|   -0.830776|  1.0000e+02|  6.3704e-05|  8.2900e-05| -1.9196e-05|
+|        4350|    0.147124|  1.7515e-01|   -6.275983|   -0.833685|  5.0000e-01|  6.3955e-05|  8.2880e-05| -1.8925e-05|
+|        4400|    0.071486|  1.7436e-01|   -6.360635|   -0.924746|  1.4930e+00|  6.3720e-05|  8.2799e-05| -1.9079e-05|
+|        4450|    0.205417|  1.7415e-01|   -6.153819|   -0.665867|  1.0000e+02|  6.3945e-05|  8.2814e-05| -1.8869e-05|
+|        4500|    0.306711|  1.7401e-01|   -6.314936|   -0.875963|  5.0000e-01|  6.3912e-05|  8.2829e-05| -1.8917e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|        4550|    0.074488|  1.7370e-01|   -6.360962|   -0.924444|  3.0959e+00|  6.3662e-05|  8.2722e-05| -1.9060e-05|
+|        4600|    0.159988|  1.7355e-01|   -6.025775|   -0.557599|  1.0000e+02|  6.3943e-05|  8.2925e-05| -1.8982e-05|
+|        4650|    0.147974|  1.7326e-01|   -6.328929|   -0.890039|  5.0000e-01|  6.3791e-05|  8.2829e-05| -1.9039e-05|
+|        4700|    0.221251|  1.7268e-01|   -6.361253|   -0.924226|  9.2442e+00|  6.3759e-05|  8.2754e-05| -1.8995e-05|
+|        4750|    0.141868|  1.7288e-01|   -6.109343|   -0.620945|  1.0000e+02|  6.3985e-05|  8.2960e-05| -1.8975e-05|
+|        4800|    0.149826|  1.7248e-01|   -6.339122|   -0.900399|  5.0000e-01|  6.3809e-05|  8.2800e-05| -1.8991e-05|
+|        4850|    0.139909|  1.7216e-01|   -6.364806|   -0.928035|  2.3003e+01|  6.3775e-05|  8.2691e-05| -1.8916e-05|
+|        4900|    0.446308|  1.7221e-01|   -6.047368|   -0.549074|  1.0000e+02|  6.3992e-05|  8.2835e-05| -1.8843e-05|
+|        4950|    0.082146|  1.7167e-01|   -6.357085|   -0.918858|  5.0000e-01|  6.3804e-05|  8.2791e-05| -1.8987e-05|
+|        5000|    0.168753|  1.7114e-01|   -6.367805|   -0.932615|  8.2422e+01|  6.3949e-05|  8.2813e-05| -1.8865e-05|
++-----------------------------------------------------------------------+
+|        File Writing Summary       |              Filename             |
++-----------------------------------------------------------------------+
+|SU2 binary restart                 |restart_flow.dat                   |
+|Paraview                           |flow.vtu                           |
+|CSV file                           |surface_flow.csv                   |
++-----------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------------------+
+|  Inner_Iter|   Time(sec)|   Time(sec)|    rms[Rho]|   rms[RhoE]|     Avg CFL|Avg_Massflow|Avg_Massflow|Avg_Massflow|
++--------------------------------------------------------------------------------------------------------------------+
+|        5050|    0.160734|  1.7156e-01|   -6.200323|   -0.756239|  1.0000e+02|  6.4149e-05|  8.2960e-05| -1.8811e-05|

@@ -56,7 +56,7 @@ lib/common.py        shared helpers: TOML access, logging, mesh grading
 lib/su2_field.py     read an SU2 flow.vtu and interpolate it at any point
 lib/capillary.py     analytical capillary mass flow (Fanno / isothermal, laminar) and SU2 tube mass flow
 su2/                 SU2 stage: setup.py, run.py, geom/   -> su2/README.md
-sparta/              SPARTA stage: setup.py, grid.py, inflow.py, gas.py, data/   -> sparta/README.md
+sparta/              SPARTA stage: setup.py, run.py, grid.py, inflow.py, gas.py, data/   -> sparta/README.md
 runs/<case>/su2/     generated run directories, one per case name
 runs/<case>/sparta/
 Archive/             older bash versions of the SU2 scripts, kept for reference only
@@ -74,12 +74,20 @@ python su2/setup.py my_case.toml                 # 2. SU2 mesh + config -> runs/
 python su2/run.py runs/<name>/su2                # 3. run SU2 (MPI ranks from [su2] nprocs)
 python sparta/setup.py my_case.toml              # 4. DSMC domain, grid, inflow -> runs/<name>/sparta/
 cd runs/<name>/sparta && spa_serial -in in.grid  # 5. check that SPARTA loads the grid
-mpirun -n N spa_mpi -in in.sparta                # 6. coupled DSMC run (check setup.log first)
+python sparta/run.py runs/<name>/sparta           # 6. coupled DSMC run, with a memory guard
 ```
+
+Or edit `runnit.py` and run `python runnit.py`. It lists one line per action; comment
+lines in or out to choose which stages run, from scratch or continued (see
+[From Python](#from-python)). Both stages can continue from restart files; see
+[su2/README.md](su2/README.md#restarting) and
+[sparta/README.md](sparta/README.md#continuing-a-run).
 
 Before step 6, read the particle count and memory estimate in `setup.log`. `max_particles`
 (default 5e6, about 1 GB) caps the automatic `fnum`. A hand-set `fnum` that is too small
-can exhaust memory and take WSL down with it. See
+can exhaust memory and take WSL down with it. `sparta/run.py` refuses to start if the
+estimate exceeds the memory limit (default half the RAM), and kills SPARTA if its actual
+memory use goes over. See
 [sparta/README.md](sparta/README.md#fnum-timestep-and-memory).
 
 Every setup script copies the case file into its run directory as `case.toml`, so each run
@@ -154,11 +162,27 @@ driver can chain them:
 from su2.setup import setup as su2_setup
 from su2.run import run as su2_run
 from sparta.setup import setup as sparta_setup
+from sparta.run import run as sparta_run
 
-d = su2_setup("my_case.toml")
-su2_run(d)
-sparta_setup("my_case.toml")
+d = su2_setup("my_case.toml")          # remeshes and resets su2.cfg (no restart)
+if su2_run(d) != 0:
+    raise SystemExit("SU2 failed")
+s = sparta_setup("my_case.toml")
+sparta_run(s)                          # memory-guarded; returns SPARTA's exit code
 ```
+
+To continue instead of starting over, call the run functions on the existing run
+directories with `restart=True`:
+
+```python
+su2_run("runs/<name>/su2", restart=True, iterations=20000)    # 20000 more SU2 iterations
+sparta_setup("my_case.toml")           # only if SU2 changed: new inflow.sparta (overwrites in.sparta edits)
+sparta_run("runs/<name>/sparta", nprocs=18, max_mem_gb=8, restart=True, target=30000)  # DSMC up to step 30000
+```
+
+`su2_run` returns 0 even if SU2 reached its iteration limit without converging. Check
+convergence before trusting the SPARTA inputs. `su2_setup` remeshes, so don't call it
+before an SU2 restart.
 
 ## Tests
 
@@ -178,7 +202,7 @@ test that runs SPARTA is off unless you set `RUN_SPARTA_TESTS=1`. See
 ## Not done yet
 
 - A first real coupled SPARTA run (`in.sparta` is written but untested on a real case),
-  grid adaptation to the DSMC density, and a `sparta/run.py`
+  and grid adaptation to the DSMC density
 - A separate SPARTA domain size: DSMC currently fills the whole SU2 chamber, which is
   expensive for large chambers
 - A breakdown criterion off the axis: the current one only looks at the axis, but in a
@@ -186,6 +210,4 @@ test that runs SPARTA is off unless you set `RUN_SPARTA_TESTS=1`. See
   ([sparta/README.md](sparta/README.md#where-to-put-the-coupling-plane))
 - An SU2 initial-pressure option: starting the domain at the 0.1 Pa back pressure can
   leave a stalled low-density layer on the nozzle wall ([su2/README.md](su2/README.md#checking-convergence))
-- An SU2 restart option in the case file; for now `su2.cfg` is edited by hand
-  ([su2/README.md](su2/README.md#restarting))
 - 3D, or geometries that are not axisymmetric

@@ -1,0 +1,16 @@
+case cd_nozzle_n2: N2, D = 0.5 mm
+domain x = [5, 120] mm (coupling plane at 10 D), r = [0, 60] mm
+grid: 1494503 cells over 6 levels (L1:17829, L2:831, L3:3641, L4:11351, L5:44959, L6:1415892)
+  cell size 18 um (finest) to 575 um (base)
+  mean free path in domain 13 um to 92.1 mm
+fnum     6.06e+17  [raised from 4.73e+16 to keep <= 5e+06 particles]
+  particles/cell: refined cells median 2.77, 10th pct 1.56; all cells min 0.0376
+  steady-state particles ~ 5e+06 (~1 GB at 200 B each)
+timestep 9.36e-09 s
+inflow: 440 points on the plane; SU2 net mass flow 7.798e-05 kg/s, emitted (one-sided) 7.922e-05 kg/s
+  plane: n 2.07e+19 to 5.48e+22 /m3, T 19.5 to 300 K, u 10.4 to 763 m/s
+hold: 25000 steps (0.000234 s) without output, then adapt the grid to the particle count averaged over the last 1000 steps (refine > 80, coarsen < 20 particles)
+run: 1000 steps (9.36e-06 s); output every 1000 (averaged over the last 500); restart file every 1000; one transit of the box at the max inflow speed takes 1.61e+04 steps
+axis Kn_GLL at coupling plane: 0.000522 (below breakdown everywhere on the axis)
+WARNING: 907778 cells still exceed lambda/3 at the level limit (worst by 4.3x): coarsen base_grid, or move the coupling plane downstream
+WARNING: the particle budget (max_particles = 5e+06) leaves the refined cells 1.6 particles (10th pct) instead of 20: results will be noisier; shrink the domain or raise max_particles

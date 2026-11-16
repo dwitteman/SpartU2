@@ -1,4 +1,4 @@
-# Example case: conical converging-diverging nozzle, deuterium, into the 5 x 2.5 cm chamber.
+# Example case: conical converging-diverging nozzle, nitrogen, into the 5 x 2.5 cm chamber.
 # The nozzle dimensions are illustrative; replace them with the real nozzle.
 #   python su2/setup.py examples/cd_nozzle_d2.toml
 
@@ -17,8 +17,8 @@ throat_length_mm = 1.5        # optional straight throat section
 
 dim = 2
 symmetry = "axial"
-chamb_length_cm = 120
-chamb_height_cm = 60
+chamb_length_cm = 12.0
+chamb_height_cm = 6.0
 
 [gas]
 species_file = "n2.species"
@@ -36,7 +36,7 @@ n_axial_conv = 120            # inlet -> throat, clustered at the throat
 n_axial_div = 200             # throat -> exit, split in two blocks clustered at each end
 n_axial_ext = 300             # exit plane -> outlet
 n_radial_ext = 200            # lip -> chamber radius
-iterations = 15000
+iterations = 25000
 nprocs = 20
 
 [sparta]
@@ -44,6 +44,7 @@ x_couple_D = 10               # in throat diameters (here 5 mm = 2.5 exit diamet
 base_grid = [200, 100]
 cells_per_mfp = 3
 ppc_target = 20
+hold_steps = 25000            # transient hold before averaging; then the grid adapts to the particles
 fnum = "auto"
 timestep_s = "auto"
 nprocs = 20
