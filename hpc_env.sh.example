@@ -1,0 +1,16 @@
+# Copy to hpc_env.sh (not tracked by git) and edit for your cluster. run_case.sh sources it
+# before anything else, on the login node and inside PBS jobs alike.
+# Find the module names with `module avail` (e.g. `module avail openmpi`, `module avail python`).
+
+# module purge
+# module load openmpi/<version>        # the MPI that SU2_CFD and spa_mpi were built with
+# module load python/<3.11 or newer>   # tomllib needs Python >= 3.11
+# module load gmsh/<version>           # only for su2_setup (or run su2_setup on your PC)
+
+# Python packages (numpy, scipy, matplotlib), once: python3 -m venv ~/venvs/spartu2 &&
+#   ~/venvs/spartu2/bin/pip install -r requirements.txt
+# source ~/venvs/spartu2/bin/activate
+
+# Solvers built in your home directory, if not on PATH:
+# export SU2_CFD=$HOME/code/SU2/install/bin/SU2_CFD
+# export SPARTA=$HOME/code/sparta/src/spa_mpi

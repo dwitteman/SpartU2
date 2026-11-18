@@ -17,7 +17,7 @@
 # Settings (environment variables, or qsub -v NAME=value,...):
 #   CASE      case file (required)
 #   STAGES    stages to run, space separated
-#   NP        MPI ranks (default: lines in $PBS_NODEFILE, else nproc)
+#   NP        MPI ranks (default: $NCPUS from PBS Pro, else lines in $PBS_NODEFILE, else nproc)
 #   MPIRUN    launcher (default: "mpirun -np $NP")
 #   SU2_ITER  ITER for su2 / su2_restart (default: keep the value in su2.cfg)
 #   BACK_PRES outlet back pressure [Pa] for su2 / su2_restart (default: keep the value in su2.cfg),
@@ -27,24 +27,34 @@
 #   TARGET    last step for sparta_restart (default: newest restart step + [sparta] run_steps)
 #   RUNS      runs directory (default: runs)
 #   PY, SU2_CFD, SPARTA   executables (default: python3, SU2_CFD, spa_mpi)
+#   ENV_FILE  bash file sourced first, e.g. module loads and a Python venv on a cluster
+#             (default: hpc_env.sh in the repo root, if it exists; see hpc_env.sh.example)
 #
 # Each stage stops the script on failure. Solver output: su2/su2.log, sparta/log.sparta
 # (a continuation writes sparta/log.<from>-<to>.sparta). Memory: check the particle
 # estimate in sparta/setup.log against the memory you request from PBS.
 
 #PBS -N spartu2
-#PBS -l nodes=1:ppn=20
-#PBS -l walltime=24:00:00
+#PBS -l select=1:ncpus=16:mpiprocs=16:mem=32gb
+#PBS -l walltime=12:00:00
 #PBS -j oe
-# PBS Pro uses instead:  #PBS -l select=1:ncpus=20:mpiprocs=20
+# PBS Pro syntax (e.g. UNSW Katana). Torque uses instead:  #PBS -l nodes=1:ppn=16
 
 set -euo pipefail
 cd "${PBS_O_WORKDIR:-$PWD}"
 
+ENV_FILE=${ENV_FILE:-hpc_env.sh}
+if [[ -f $ENV_FILE ]]; then
+    set +u; source "$ENV_FILE"; set -u   # module scripts often use unset variables
+    echo "sourced $ENV_FILE"
+fi
+
 : "${CASE:?set CASE to a case file, e.g. CASE=examples/cd_nozzle_n2.toml}"
 STAGES=${STAGES:-"su2_setup su2 handoff sparta_setup sparta"}
 if [[ -z ${NP:-} ]]; then
-    if [[ -n ${PBS_NODEFILE:-} ]]; then NP=$(wc -l < "$PBS_NODEFILE"); else NP=$(nproc); fi
+    if [[ -n ${NCPUS:-} ]]; then NP=$NCPUS
+    elif [[ -n ${PBS_NODEFILE:-} ]]; then NP=$(wc -l < "$PBS_NODEFILE")
+    else NP=$(nproc); fi
 fi
 MPIRUN=${MPIRUN:-"mpirun -np $NP"}
 RUNS=${RUNS:-runs}

@@ -13,3 +13,14 @@ runs/**/plots/
 # SU2 run archives and backups
 runs/**/archive/
 *.bak
+
+# per-machine environment for run_case.sh (hpc_env.sh.example is the template)
+/hpc_env.sh
+*:Zone.Identifier
+/log.sparta
+runs/**/flow.vtu
+runs/**/restart_flow.dat
+runs/**/mesh.su2
+runs/**/surface_flow.csv
+runs/**/history.csv
+runs/**/*_back/
