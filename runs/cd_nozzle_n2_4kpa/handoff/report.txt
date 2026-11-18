@@ -1,0 +1,44 @@
+Breakdown report: cd_nozzle_n2_4kpa (N2)
+SU2 solution: /home/dan/sim/SpartU2/runs/cd_nozzle_n2_4kpa/su2/flow.vtu
+plane placed by handoff.breakdown_2d, threshold Kn_GLL = 0.01
+breakdown point from that module: x = -37.45 mm = -74.9 D (inside the nozzle, 2.42 D before the throat middle)
+x = 0 is the nozzle exit; x < 0 is inside the nozzle or capillary, where each plane ends at the wall
+coupling plane (forced): x = 5 mm = 10 D
+
+Per plane (2D = Boyd's Kn_GLL with rho, T and |V| gradients; mass fraction = share of the
+plane's inward mass flow passing through gas with Kn_GLL(2D) > threshold):
+      x/D          axis Kn(rho)  axis Kn(2D)  plane max  mass frac   mdot kg/s
+     -108 inlet           3e-07     9.76e-06   0.000181      0.00%   1.016e-06
+    -81.2              1.91e-05     8.62e-05    0.00206      0.00%   1.006e-06
+    -72.5 throat       0.000514     0.000576     0.0239     28.35%   1.003e-06
+    -54.4                0.0146       0.0339      0.138    100.00%   1.056e-06
+    -26.6                0.0265       0.0337      0.148    100.00%   1.102e-06
+    -11.2                0.0498       0.0567      0.228    100.00%   1.116e-06
+        0 exit            0.109        0.125        173    100.00%   1.125e-06
+    0.495                 0.112        0.129        228    100.00%   1.314e-06
+     1.01                 0.116        0.135        174    100.00%   1.327e-06
+        2                 0.124        0.146       92.9    100.00%   1.334e-06
+     3.04                 0.132         0.16       60.6    100.00%   1.337e-06
+     4.99                 0.147        0.185       32.1    100.00%    1.34e-06
+     7.51                 0.167        0.222       18.4    100.00%   1.343e-06
+       10                 0.187        0.262       12.1    100.00%   1.345e-06
+     14.8                  0.23        0.349       7.39    100.00%   1.347e-06
+       20                 0.284        0.428       4.86    100.00%   1.347e-06
+       30                 0.396        0.582       3.68    100.00%   1.339e-06
+     50.1                 0.578        0.821       5.26    100.00%   1.296e-06
+     79.3                 0.683        0.938       4.84    100.00%   1.201e-06
+      119                 0.588         0.84       98.7    100.00%   1.089e-06
+      199                 0.176        0.223        416    100.00%   1.015e-06
+
+At the coupling plane:
+  Kn_GLL(2D) on the axis 0.262, largest on the plane 12.1 at r = 19 mm
+  Kn_GLL(2D) > 0.01 from r = 0 mm outward
+  term setting Kn where it is over the threshold (SU2 nodes): rho 240, T 0, V 1
+  SU2 net mass flow 1.345e-06 kg/s; SPARTA one-sided emission 3.236e-06 kg/s
+
+Checks:
+  [!!] plane is DOWNSTREAM of the breakdown point: SU2 is not reliable there
+  [!!] 100.00% of the mass flow through the plane has Kn_GLL(2D) > 0.01 (limit 1%)
+  [!!] SU2 mass flow: 1.125e-06 kg/s at the exit, 1.345e-06 kg/s at the plane (19.6% apart, limit 5%)
+  [!!] SPARTA emits 2.41x the SU2 net mass flow (one-sided flux includes the thermal back-flow of slow gas; large values mean a dense background on the plane)
+  [ok] plane state: n 2.48e+19 to 7.39e+20 /m3, T 254 to 300 K, u 11.89 to 339.3 m/s

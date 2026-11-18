@@ -12,7 +12,8 @@ Reads the SU2 solution (RUNS/<name>/su2/flow.vtu by default) and writes RUNS/<na
 
 The coupling plane comes from [sparta] x_couple_D:
   "auto" (default)  couple_margin_D throat diameters (default 1) upstream of the first point
-                    where the breakdown module's Kn exceeds kn_breakdown;
+                    where the breakdown module's Kn exceeds kn_breakdown; stops if that point is
+                    inside the nozzle or capillary (the breakdown profile covers them too);
   a number          forces the plane there, in throat diameters past the nozzle exit.
 The module is [sparta] breakdown_module (handoff.breakdown_gll: axis only; handoff.breakdown_2d:
 Boyd's full Kn_GLL over each plane); its options go in a [breakdown] section.
@@ -55,13 +56,20 @@ def load_breakdown(name: str):
 def choose_plane(x_couple_D, D, x_break, margin_D=1.0, x_max=np.inf):
     """Coupling plane x [m] (0 = nozzle exit).
 
-    x_couple_D: "auto" or a number of throat diameters D [m]; x_break: first axis breakdown
-    point [m] or None. "auto" puts the plane margin_D diameters upstream of x_break."""
+    x_couple_D: "auto" or a number of throat diameters D [m]; x_break: first breakdown point
+    [m] or None, negative if it is inside the nozzle or capillary. "auto" puts the plane margin_D
+    diameters upstream of x_break. The plane must be in the chamber (x >= 0): the DSMC domain
+    starts at the plane and has no nozzle walls."""
     if x_couple_D == "auto":
         if x_break is None:
             die("Kn_GLL stays below the threshold on the whole SU2 axis, so there is no breakdown "
                 "point to couple at: set [sparta] x_couple_D to a number to force the plane")
         x_c = x_break - margin_D * D
+        if x_break < 0:
+            die(f"the gas breaks down inside the nozzle, at x = {x_break / D:.3g} D "
+                f"({x_break * 1e3:.4g} mm before the exit), but the DSMC domain can only start in the "
+                f"chamber: force [sparta] x_couple_D (as close to the exit as you accept), and see "
+                f"report.txt for how far the breakdown reaches")
         if x_c < 0:
             die(f"breakdown at {x_break / D:.3g} D is within couple_margin_D = {margin_D:g} D of the "
                 f"nozzle exit: lower couple_margin_D or force x_couple_D")
@@ -94,7 +102,7 @@ def handoff(case_path, runs_dir="runs", su2_vtu=None) -> Path:
         die(f"{vtu} not found: run SU2 first or pass --su2")
     gas = load_gas(get(case, "gas", "species_file"))
     log(f"reading SU2 solution {vtu}")
-    field = Su2Field(vtu, xmin=-1e-9)  # chamber only (x >= exit plane)
+    field = Su2Field(vtu)  # whole domain: nozzle/capillary (x < 0) and chamber
 
     # ---- breakdown profile and the coupling plane -------------------------------
     module = get(case, "sparta", "breakdown_module", DEFAULT_BREAKDOWN)
@@ -138,7 +146,8 @@ def handoff(case_path, runs_dir="runs", su2_vtu=None) -> Path:
         f"u_max = {float(plane['u'].max()):.6g}\n")
 
     log(f"{module}: Kn first exceeds {thr} at "
-        + (f"x = {x_break / D:.3g} D" if x_break is not None else "no point in the SU2 domain"))
+        + (f"x = {x_break / D:.3g} D" + (" (inside the nozzle)" if x_break < 0 else "")
+           if x_break is not None else "no point in the SU2 domain"))
     log(f"coupling plane ({'auto' if mode == 'auto' else 'forced'}): x = {x_c * 1e3:.4g} mm = "
         f"{x_c / D:.3g} D, Kn_GLL there {kn_c:.3g}")
     log(f"inflow: {len(plane['r'])} points; SU2 net mass flow {flows['mdot_net']:.4g} kg/s, "

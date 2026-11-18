@@ -33,9 +33,19 @@ Two versions, chosen with `breakdown_module`:
 | `handoff.breakdown_gll` (default) | λ\|dρ/dx\|/ρ, density only, on the SU2 axis nodes | Kn on the axis |
 | `handoff.breakdown_2d` | Boyd's full form at every SU2 node: λ·max(\|∇ρ\|/ρ, \|∇T\|/T, \|∇V\|/max(V, a)) | the Kn exceeded by `mass_fraction` (default 1%) of the mass flow through the plane |
 
+Both cover the **whole SU2 domain**, from the nozzle or capillary inlet (x < 0) through the
+chamber, so breakdown inside a diverging section or a tube is reported where it happens
+(a negative x), not at the exit. The coupling plane itself must still be in the chamber
+(x ≥ 0), since the DSMC domain has no nozzle walls: with `"auto"`, breakdown inside the
+nozzle stops the handoff with a message, and you force the plane instead.
+
 In `breakdown_2d`:
 - **Gradients** come from the SU2 mesh itself: the exact gradient of the linear interpolant on each
-  Delaunay triangle, averaged to the nodes by area.
+  Delaunay triangle, averaged to the nodes by area. Triangles outside the mesh (outside the
+  nozzle wall, where the domain is not convex) are masked out, so nothing is differentiated
+  or interpolated across a wall.
+- **Planes inside the nozzle** run from the axis to the wall at that x; in the chamber, to the
+  chamber height.
 - **Speed term:** dividing by max(V, a), with a the speed of sound, keeps it finite in gas at rest.
 - **Placing the plane:** every plume plane has some broken-down gas (the lip, the jet edge, the
   background), so a plain maximum over the plane would always fail. Instead, `first_breakdown`
@@ -47,8 +57,10 @@ In `breakdown_2d`:
 `report.txt` always uses the full 2D Kn_GLL as an independent check, whichever module placed
 the plane. It contains:
 - **The choice:** which module placed the plane, the threshold, the breakdown point and the plane.
-- **A table along the jet** at fixed x/D: axis Kn (density only), axis Kn (2D), the largest Kn
-  on the plane, the share of the plane's mass flow over the threshold, and the SU2 mass flow.
+- **A table along the nozzle and jet**: rows at the nozzle inlet, through the nozzle (the throat
+  marked), at the exit, and at fixed x/D in the plume. Each has axis Kn (density only), axis Kn (2D),
+  the largest Kn on the plane, the share of the plane's mass flow over the threshold, and the SU2
+  mass flow (which should be the same on every row of a converged solution).
 - **At the coupling plane:** Kn on the axis and its maximum; the radius beyond which Kn is over
   the threshold; which term (ρ, T or V) sets Kn there; the SU2 net and SPARTA emitted mass flow.
 - **Checks**, each marked `[ok]` or `[!!]` (flagged ones are also printed by the handoff):

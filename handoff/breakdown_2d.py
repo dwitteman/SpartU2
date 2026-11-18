@@ -8,7 +8,12 @@ At every SU2 node (Boyd, Chen & Chandler 1995; Wang & Boyd 2003):
 with lambda the local VSS mean free path, V the flow speed and a the speed of sound.
 Dividing the speed gradient by max(V, a) instead of V keeps it finite where the gas is
 nearly at rest. Gradients are taken on the SU2 mesh itself: the exact gradient of the
-linear interpolant on each Delaunay triangle, averaged to the nodes weighted by area.
+linear interpolant on each Delaunay triangle inside the domain, averaged to the nodes
+weighted by area.
+
+The profile covers the whole SU2 domain: the nozzle or capillary (x < 0, each plane out
+to the wall) as well as the plume, so breakdown inside a diverging section or a tube is
+found where it happens rather than reported at the exit.
 
 The coupling plane needs one number per axial station x. A plume always has broken-down
 gas somewhere on any plane (the lip, the edge of the jet, the near-vacuum background), so the
@@ -26,7 +31,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-from scipy.interpolate import LinearNDInterpolator
 
 if __package__ in (None, ""):  # allow `python handoff/breakdown_2d.py` as well as `-m`
     sys.path[0] = str(Path(__file__).resolve().parents[1])
@@ -73,24 +77,30 @@ def kn_field(field, gas):
     nd = field.nodes
     rho, T = nd["rho"], nd["T"]
     V = np.hypot(nd["u"], nd["v"])
-    g = node_gradients(field.xy, field.tri.simplices, np.column_stack([rho, T, V]))
+    g = node_gradients(field.xy, field.simplices, np.column_stack([rho, T, V]))
     ratio = np.hypot(g[..., 0], g[..., 1]) / np.column_stack([rho, T, np.maximum(V, sound_speed(gas, T))])
     lam = gas.mean_free_path(rho / gas.mass, T)
     return lam * ratio.max(axis=1), ratio.argmax(axis=1)
 
 
 def plane_lines(field, kn, xs, n_r=400):
-    """Kn_GLL, mass-flow weights and net mass flow on radial lines x = xs[i].
+    """Kn_GLL, mass-flow weights and net mass flow on radial lines x = xs[i], each from the axis
+    to the edge of the domain there (the nozzle or capillary wall for x < 0, the chamber height
+    after), with points clustered at both ends.
 
-    Returns r (n_r,), kn (len(xs), n_r), w (len(xs), n_r) = rho * max(u, 0) * 2 pi r dr
-    (inward mass flow per point), mdot (len(xs),) net rho*u through each plane [kg/s]."""
-    r_max = field.xy[:, 1].max()
-    r = np.unique(np.concatenate([np.linspace(0, r_max, n_r), np.geomspace(1e-6 * r_max, r_max, n_r)]))
-    interp = LinearNDInterpolator(field.tri, np.column_stack([kn, field.nodes["rho"], field.nodes["u"]]))
-    X, R = np.meshgrid(xs, r, indexing="ij")
-    vals = interp(np.column_stack([X.ravel(), R.ravel()])).reshape(len(xs), len(r), 3)
+    Returns r (len(xs), m), kn (len(xs), m), w (len(xs), m) = rho * max(u, 0) * 2 pi r dr
+    (inward mass flow per point), mdot (len(xs),) net rho*u through each plane [kg/s].
+    Points outside the domain get kn = w = 0."""
+    xs = np.asarray(xs, float)
+    s = np.unique(np.concatenate([np.linspace(0, 1, n_r), np.geomspace(1e-6, 1, n_r),
+                                  1 - np.geomspace(1e-6, 1, n_r)]))
+    r_top = np.nan_to_num(field.r_top(xs), nan=0.0)
+    r = r_top[:, None] * s[None, :]
+    X = np.broadcast_to(xs[:, None], r.shape)
+    vals = field.interpolate(np.column_stack([kn, field.nodes["rho"], field.nodes["u"]]),
+                             np.column_stack([X.ravel(), r.ravel()])).reshape(*r.shape, 3)
     vals = np.nan_to_num(vals)
-    dr = np.diff(r, prepend=r[0]) / 2 + np.diff(r, append=r[-1]) / 2  # trapezoid weights
+    dr = np.diff(r, axis=1, prepend=r[:, :1]) / 2 + np.diff(r, axis=1, append=r[:, -1:]) / 2  # trapezoid
     flux = vals[..., 1] * vals[..., 2] * 2 * np.pi * r * dr
     return r, vals[..., 0], np.maximum(flux, 0), flux.sum(axis=1)
 
@@ -108,8 +118,9 @@ def mass_quantile(kn, w, fraction):
     return out
 
 
-def stations(field, n_max=400):
-    """Axial stations: the SU2 axis node positions (clustered like the mesh), at most n_max."""
+def stations(field, n_max=800):
+    """Axial stations: the SU2 axis node positions (clustered like the mesh), at most n_max.
+    They run from the nozzle or capillary inlet (x < 0) through the chamber."""
     x = axis_profile(field)[0]
     return x[np.unique(np.linspace(0, len(x) - 1, min(n_max, len(x))).round().astype(int))]
 
@@ -142,15 +153,16 @@ def main(argv=None):
     frac = case.get("breakdown", {}).get("mass_fraction", MASS_FRACTION)
     vtu = args.su2 or Path(args.runs) / get(case, "case", "name") / "su2" / "flow.vtu"
     gas = load_gas(get(case, "gas", "species_file"))
-    x, kn = knudsen_profile(Su2Field(vtu, xmin=-1e-9), gas, frac)
+    x, kn = knudsen_profile(Su2Field(vtu), gas, frac)
 
     print(f"Kn_GLL exceeded by {frac:.0%} of the mass flow through each plane")
     print(f"{'x/D':>8} {'Kn_GLL':>10}")
-    for xd in (0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 40, 80):
-        if xd * D <= x[-1]:
+    for xd in (x[0] / D, 0.5 * x[0] / D, 0.1 * x[0] / D, 0, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 40, 80):
+        if x[0] <= xd * D <= x[-1]:
             print(f"{xd:8g} {kn_at(x, kn, xd * D):10.3g}")
     xb = first_breakdown(x, kn, thr)
     log(f"first plane with more than {frac:.0%} of the mass flow above Kn_GLL = {thr}: x = {xb / D:.3g} D"
+        + (" (inside the nozzle)" if xb < 0 else "")
         if xb is not None else f"no plane has more than {frac:.0%} of its mass flow above {thr}")
 
 

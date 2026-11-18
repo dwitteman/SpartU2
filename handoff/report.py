@@ -12,6 +12,7 @@ from handoff import breakdown_2d as b2d
 from handoff import breakdown_gll as gll
 
 STATIONS_D = (0, 0.5, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 50, 80, 120, 200)
+NOZZLE_FRACTIONS = (1, 0.75, 0.5, 0.25, 0.1)  # nozzle/capillary rows, as fractions of its length before the exit
 MDOT_TOL = 0.05  # mass-flow conservation between the exit and the plane
 
 
@@ -26,13 +27,23 @@ def analyse(field, gas, x_c, thr):
         frac = (w * (kl > thr)).sum(axis=1) / w.sum(axis=1)
     xa, kn_axis_rho = gll.axis_knudsen(field, gas)
     ic = int(np.argmin(np.abs(xs - x_c)))
+    i0 = int(np.argmin(np.abs(xs)))  # nozzle exit
+    # throat: the narrowest point of a nozzle (none for a straight capillary)
+    x_throat = None
+    if xs[0] < 0:
+        inner = xs[xs < 0]
+        rt = field.r_top(inner)
+        r_min = np.nanmin(rt)
+        if r_min < 0.98 * min(rt[0], rt[-1]):
+            flat = inner[rt <= r_min * 1.001]  # a straight throat section: take its middle
+            x_throat = float(0.5 * (flat[0] + flat[-1]))
     # dominant term at the plane: nodes of the SU2 column nearest the plane
     cols = np.unique(field.xy[:, 0])
     col = np.abs(field.xy[:, 0] - cols[np.argmin(np.abs(cols - x_c))]) < 1e-12
     over = col & (kn > thr)
     dom_counts = np.bincount(dom[over], minlength=3) if over.any() else np.zeros(3, int)
     return dict(kn=kn, dom=dom, xs=xs, r=r, kl=kl, w=w, mdot=mdot, frac=frac, xa=xa,
-                kn_axis_rho=kn_axis_rho, ic=ic, dom_counts=dom_counts)
+                kn_axis_rho=kn_axis_rho, ic=ic, i0=i0, x_throat=x_throat, dom_counts=dom_counts)
 
 
 def checks(a, x_c, x_break, flows, plane, mass_fraction, thr):
@@ -45,7 +56,7 @@ def checks(a, x_c, x_break, flows, plane, mass_fraction, thr):
     out.append((f <= mass_fraction,
                 f"{f:.2%} of the mass flow through the plane has Kn_GLL(2D) > {thr} "
                 f"(limit {mass_fraction:.0%})"))
-    m0, mc = a["mdot"][0], a["mdot"][ic]
+    m0, mc = a["mdot"][a["i0"]], a["mdot"][ic]
     dev = abs(mc / m0 - 1) if m0 else np.inf
     out.append((dev <= MDOT_TOL,
                 f"SU2 mass flow: {m0:.4g} kg/s at the exit, {mc:.4g} kg/s at the plane "
@@ -65,8 +76,15 @@ def text(a, info, chk):
     """The report as a string. info: case, gas, vtu, module, thr, opts, mode, D, x_c, x_break."""
     D, x_c, thr = info["D"], info["x_c"], info["thr"]
     xs, ic = a["xs"], a["ic"]
+    rc = a["r"][ic]
     i_r = a["kl"][ic] > thr
-    r_first = a["r"][np.argmax(i_r)] if i_r.any() else None
+    r_first = rc[np.argmax(i_r)] if i_r.any() else None
+    xb = info["x_break"]
+    where_b = ""
+    if xb is not None and xb < 0:
+        dt = None if a["x_throat"] is None else (xb - a["x_throat"]) / D
+        where_b = " (inside the nozzle" + (
+            "" if dt is None else f", {abs(dt):.3g} D {'after' if dt >= 0 else 'before'} the throat middle") + ")"
     dom = a["dom_counts"]
     lines = [
         f"Breakdown report: {info['case']} ({info['gas']})",
@@ -74,25 +92,35 @@ def text(a, info, chk):
         f"plane placed by {info['module']}, threshold Kn_GLL = {thr}"
         + (f", options {info['opts']}" if info["opts"] else ""),
         f"breakdown point from that module: "
-        + (f"x = {info['x_break'] * 1e3:.4g} mm = {info['x_break'] / D:.3g} D" if info["x_break"] is not None
+        + (f"x = {xb * 1e3:.4g} mm = {xb / D:.3g} D{where_b}" if xb is not None
            else "none in the SU2 domain"),
+        "x = 0 is the nozzle exit; x < 0 is inside the nozzle or capillary, where each plane"
+        " ends at the wall",
         f"coupling plane ({info['mode']}): x = {x_c * 1e3:.4g} mm = {x_c / D:.3g} D",
         "",
         "Per plane (2D = Boyd's Kn_GLL with rho, T and |V| gradients; mass fraction = share of the",
         "plane's inward mass flow passing through gas with Kn_GLL(2D) > threshold):",
-        f"  {'x/D':>6} {'axis Kn(rho)':>13} {'axis Kn(2D)':>12} {'plane max':>10} {'mass frac':>10} {'mdot kg/s':>11}",
+        f"  {'x/D':>7} {'':7} {'axis Kn(rho)':>13} {'axis Kn(2D)':>12} {'plane max':>10} {'mass frac':>10} {'mdot kg/s':>11}",
     ]
+    rows = {}
+    if xs[0] < 0:
+        for f in NOZZLE_FRACTIONS:
+            rows[int(np.argmin(np.abs(xs - f * xs[0])))] = "inlet" if f == 1 else ""
+        if a["x_throat"] is not None:
+            rows[int(np.argmin(np.abs(xs - a["x_throat"])))] = "throat"
     for xd in STATIONS_D:
         if xd * D > xs[-1]:
             break
-        i = int(np.argmin(np.abs(xs - xd * D)))
-        lines.append(f"  {xs[i] / D:6.3g} {gll.kn_at(a['xa'], a['kn_axis_rho'], xs[i]):13.3g} "
+        rows.setdefault(int(np.argmin(np.abs(xs - xd * D))), "")
+    rows[a["i0"]] = "exit"
+    for i in sorted(rows):
+        lines.append(f"  {xs[i] / D:7.3g} {rows[i]:7} {gll.kn_at(a['xa'], a['kn_axis_rho'], xs[i]):13.3g} "
                      f"{a['kl'][i, 0]:12.3g} {a['kl'][i].max():10.3g} {a['frac'][i]:10.2%} {a['mdot'][i]:11.4g}")
     lines += [
         "",
         "At the coupling plane:",
         f"  Kn_GLL(2D) on the axis {a['kl'][ic, 0]:.3g}, largest on the plane {a['kl'][ic].max():.3g} "
-        f"at r = {a['r'][np.argmax(a['kl'][ic])] * 1e3:.4g} mm",
+        f"at r = {rc[np.argmax(a['kl'][ic])] * 1e3:.4g} mm",
         f"  Kn_GLL(2D) > {thr} from r = {r_first * 1e3:.4g} mm outward" if r_first is not None
         else f"  Kn_GLL(2D) <= {thr} across the whole plane",
         f"  term setting Kn where it is over the threshold (SU2 nodes): "
@@ -122,11 +150,13 @@ def figure(path, a, info):
                          "text.color": INK, "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.6,
                          "font.size": 9, "axes.spines.top": False, "axes.spines.right": False})
     D, x_c, thr, xb = info["D"], info["x_c"], info["thr"], info["x_break"]
-    xy, ic, r = info["xy"], a["ic"], a["r"]
+    xy, ic, r = info["xy"], a["ic"], a["r"][a["ic"]]
     fig, ax = plt.subplots(2, 2, figsize=(11, 7.5), constrained_layout=True)
 
     # (a) Kn map, near field
     ext = min(xy[:, 0].max(), max(3 * x_c, 20 * D))
+    # include the nozzle from its throat (or the last ext of a capillary) when there is one
+    x_lo = 0.0 if xy[:, 0].min() >= 0 else max(xy[:, 0].min(), a["x_throat"] if a["x_throat"] is not None else -ext)
     rext = min(xy[:, 1].max(), 0.6 * ext)
     m = ax[0, 0]
     tri = Triangulation(xy[:, 0] * 1e3, xy[:, 1] * 1e3, info["simplices"])
@@ -134,9 +164,13 @@ def figure(path, a, info):
     pc = m.tripcolor(tri, lk, shading="gouraud", cmap="Blues", vmin=-5, vmax=1, rasterized=True)
     m.tricontour(tri, lk, levels=[np.log10(thr)], colors=ORANGE, linewidths=1.2)
     m.axvline(x_c * 1e3, color=INK, ls=":", lw=1.2)  # coupling plane
-    m.set_xlim(0, ext * 1e3); m.set_ylim(0, rext * 1e3); m.grid(False)
+    if x_lo < 0:
+        m.axvline(0, color=MUTED, ls="--", lw=0.8)  # nozzle exit
+    if xb is not None and x_lo <= xb <= ext:
+        m.axvline(xb * 1e3, color=ORANGE, ls=":", lw=1.2)  # breakdown point
+    m.set_xlim(x_lo * 1e3, ext * 1e3); m.set_ylim(0, rext * 1e3); m.grid(False)
     m.set_xlabel("x [mm]"); m.set_ylabel("r [mm]")
-    m.set_title(f"Kn_GLL (2D) near the exit; orange line: Kn = {thr}", loc="left")
+    m.set_title(f"Kn_GLL (2D) around the exit (dashed); orange line: Kn = {thr}", loc="left")
     fig.colorbar(pc, ax=m, shrink=0.9, pad=0.01, label="log10 Kn_GLL")
 
     # (b) along x
@@ -151,10 +185,16 @@ def figure(path, a, info):
     p.axvline(x_c / D, color=INK, ls=":", lw=1.2, label="coupling plane")
     if xb is not None:
         p.axvline(xb / D, color=ORANGE, ls=":", lw=1.2, label="breakdown point")
-    p.set_yscale("log"); p.set_xscale("symlog", linthresh=1); p.set_xlim(0, a["xs"][-1] / D)
+    if a["xs"][0] < 0:
+        p.axvline(0, color=MUTED, ls="--", lw=0.8, label="nozzle exit")
+        if a["x_throat"] is not None:
+            p.axvline(a["x_throat"] / D, color=MUTED, ls="-.", lw=0.8, label="throat")
+    # linear through the nozzle (and as far into the plume), logarithmic beyond
+    p.set_yscale("log"); p.set_xscale("symlog", linthresh=max(1.0, -a["xs"][0] / D))
+    p.set_xlim(a["xs"][0] / D, a["xs"][-1] / D)
     p.set_xlabel("x / D"); p.set_ylabel("Kn_GLL")
-    p.set_title("Kn_GLL along the jet", loc="left")
-    p.legend(frameon=False, fontsize=7.5, loc="center left", bbox_to_anchor=(0.02, 0.40))
+    p.set_title("Kn_GLL along the nozzle and jet", loc="left")
+    p.legend(frameon=False, fontsize=7.5, loc="lower right")
 
     # (c) across the plane: Kn
     q = ax[1, 0]
@@ -187,7 +227,7 @@ def write(out_dir, field, gas, info, plane, flows, mass_fraction):
     a = analyse(field, gas, info["x_c"], info["thr"])
     chk = checks(a, info["x_c"], info["x_break"], flows, plane, mass_fraction, info["thr"])
     info = dict(info, mdot_net=flows["mdot_net"], mdot_inward=flows["mdot_inward"],
-                xy=field.xy, simplices=field.tri.simplices)
+                xy=field.xy, simplices=field.simplices)
     txt = text(a, info, chk)
     out_dir = Path(out_dir)
     if not figure(out_dir / "report.png", a, info):

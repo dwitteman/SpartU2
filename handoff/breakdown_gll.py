@@ -5,7 +5,8 @@ The gradient-length local Knudsen number (Boyd, Chen & Chandler 1995) is
 
     Kn_GLL = lambda * |d rho / dx| / rho
 
-where lambda is the local mean free path. Navier-Stokes is trusted where
+where lambda is the local mean free path. The axis runs from the nozzle or capillary
+inlet (x < 0) through the chamber. Navier-Stokes is trusted where
 Kn_GLL < KN_BREAKDOWN, and the coupling plane must sit upstream of the first
 point where that fails.
 
@@ -89,14 +90,15 @@ def main(argv=None):
     thr = get(case, "sparta", "kn_breakdown", KN_BREAKDOWN)
     vtu = args.su2 or Path(args.runs) / get(case, "case", "name") / "su2" / "flow.vtu"
     gas = load_gas(get(case, "gas", "species_file"))
-    x, kn = axis_knudsen(Su2Field(vtu, xmin=-1e-9), gas)
+    x, kn = axis_knudsen(Su2Field(vtu), gas)
 
     print(f"{'x/D':>8} {'Kn_GLL':>10}")
-    for xd in (0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20):
-        if xd * D <= x[-1]:
+    for xd in (x[0] / D, 0.5 * x[0] / D, 0.1 * x[0] / D, 0, 0.5, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20):
+        if x[0] <= xd * D <= x[-1]:
             print(f"{xd:8g} {kn_at(x, kn, xd * D):10.3g}")
     xb = first_breakdown(x, kn, thr)
-    log(f"Kn_GLL first exceeds {thr} at x = {xb / D:.3g} D" if xb is not None
+    log(f"Kn_GLL first exceeds {thr} at x = {xb / D:.3g} D" + (" (inside the nozzle)" if xb < 0 else "")
+        if xb is not None
         else f"Kn_GLL stays below {thr} on the axis")
 
 
