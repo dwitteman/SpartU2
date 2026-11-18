@@ -12,9 +12,11 @@ Reads the SU2 solution (RUNS/<name>/su2/flow.vtu by default) and writes RUNS/<na
 
 The coupling plane comes from [sparta] x_couple_D:
   "auto" (default)  couple_margin_D throat diameters (default 1) upstream of the first point
-                    where the breakdown module's Kn exceeds kn_breakdown; stops if that point is
-                    inside the nozzle or capillary (the breakdown profile covers them too);
-  a number          forces the plane there, in throat diameters past the nozzle exit.
+                    where the breakdown module's Kn exceeds kn_breakdown, inside the nozzle or
+                    capillary if that is where it happens (the DSMC domain then includes the
+                    rest of the nozzle, with walls);
+  a number          forces the plane there, in throat diameters from the nozzle exit (negative
+                    inside the nozzle); refused if it is past the breakdown point.
 The module is [sparta] breakdown_module (handoff.breakdown_gll: axis only; handoff.breakdown_2d:
 Boyd's full Kn_GLL over each plane); its options go in a [breakdown] section.
 """
@@ -53,30 +55,28 @@ def load_breakdown(name: str):
     return mod
 
 
-def choose_plane(x_couple_D, D, x_break, margin_D=1.0, x_max=np.inf):
-    """Coupling plane x [m] (0 = nozzle exit).
+def choose_plane(x_couple_D, D, x_break, margin_D=1.0, x_max=np.inf, x_min=-np.inf):
+    """Coupling plane x [m] (0 = nozzle exit, negative inside the nozzle or capillary).
 
     x_couple_D: "auto" or a number of throat diameters D [m]; x_break: first breakdown point
-    [m] or None, negative if it is inside the nozzle or capillary. "auto" puts the plane margin_D
-    diameters upstream of x_break. The plane must be in the chamber (x >= 0): the DSMC domain
-    starts at the plane and has no nozzle walls."""
+    [m] or None. "auto" puts the plane margin_D diameters upstream of x_break, wherever that
+    is: inside the nozzle the DSMC domain then includes the rest of it, with walls. A forced
+    plane must not be past x_break, where SU2 is no longer valid. The plane must lie in
+    (x_min, x_max): after the SU2 inlet and before the end of the chamber."""
     if x_couple_D == "auto":
         if x_break is None:
-            die("Kn_GLL stays below the threshold on the whole SU2 axis, so there is no breakdown "
+            die("Kn_GLL stays below the threshold in the whole SU2 domain, so there is no breakdown "
                 "point to couple at: set [sparta] x_couple_D to a number to force the plane")
         x_c = x_break - margin_D * D
-        if x_break < 0:
-            die(f"the gas breaks down inside the nozzle, at x = {x_break / D:.3g} D "
-                f"({x_break * 1e3:.4g} mm before the exit), but the DSMC domain can only start in the "
-                f"chamber: force [sparta] x_couple_D (as close to the exit as you accept), and see "
-                f"report.txt for how far the breakdown reaches")
-        if x_c < 0:
-            die(f"breakdown at {x_break / D:.3g} D is within couple_margin_D = {margin_D:g} D of the "
-                f"nozzle exit: lower couple_margin_D or force x_couple_D")
     else:
         x_c = float(x_couple_D) * D
-    if not 0 <= x_c < x_max:
-        die(f"coupling plane x = {x_c * 1e3:.4g} mm is outside the chamber [0, {x_max * 1e3:.4g}) mm")
+        if x_break is not None and x_c > x_break:
+            die(f"x_couple_D = {x_couple_D} puts the plane at {x_c / D:.3g} D, past the breakdown point "
+                f"at {x_break / D:.3g} D where SU2 is no longer valid: use x_couple_D = \"auto\" or a "
+                f"value <= {x_break / D:.3g}")
+    if not x_min < x_c < x_max:
+        die(f"coupling plane x = {x_c * 1e3:.4g} mm ({x_c / D:.3g} D) is outside the SU2 domain "
+            f"({x_min * 1e3:.4g}, {x_max * 1e3:.4g}) mm: lower couple_margin_D or set x_couple_D")
     return x_c
 
 
@@ -116,11 +116,12 @@ def handoff(case_path, runs_dir="runs", su2_vtu=None) -> Path:
     x_break = bd.first_breakdown(xa, kn, thr)
     mode = get(case, "sparta", "x_couple_D", "auto")
     margin = get(case, "sparta", "couple_margin_D", 1.0)
-    x_c = choose_plane(mode, D, x_break, margin, Lx)
+    x_c = choose_plane(mode, D, x_break, margin, Lx, x_min=float(field.xy[:, 0].min()))
+    r_wall = float(min(Rext, field.r_top([x_c])[0]))  # edge of the flow on the plane
     kn_c = bd.kn_at(xa, kn, x_c)
 
     # ---- SU2 state on the plane ------------------------------------------------
-    plane = inflow.sample_plane(field, gas, x_c, inflow.plane_radii(field, x_c, Rext))
+    plane = inflow.sample_plane(field, gas, x_c, inflow.plane_radii(field, x_c, r_wall))
     flows = inflow.plane_summary(plane, gas.mass)
 
     out = Path(runs_dir) / name / "handoff"
@@ -138,6 +139,7 @@ def handoff(case_path, runs_dir="runs", su2_vtu=None) -> Path:
         f'mode = "{"auto" if mode == "auto" else "forced"}"\n'
         f"x_couple_m = {x_c:.10g}\n"
         f"x_couple_D = {x_c / D:.6g}\n"
+        f"r_wall_m = {r_wall:.10g}      # radius of the flow on the plane (nozzle wall, or chamber height)\n"
         f"kn_at_plane = {kn_c:.6g}\n"
         f"kn_threshold = {thr:g}\n"
         f"{xb}"
@@ -149,12 +151,10 @@ def handoff(case_path, runs_dir="runs", su2_vtu=None) -> Path:
         + (f"x = {x_break / D:.3g} D" + (" (inside the nozzle)" if x_break < 0 else "")
            if x_break is not None else "no point in the SU2 domain"))
     log(f"coupling plane ({'auto' if mode == 'auto' else 'forced'}): x = {x_c * 1e3:.4g} mm = "
-        f"{x_c / D:.3g} D, Kn_GLL there {kn_c:.3g}")
+        f"{x_c / D:.3g} D" + (f" (inside the nozzle, wall radius {r_wall * 1e3:.4g} mm)" if x_c < 0 else "")
+        + f", Kn there {kn_c:.3g}")
     log(f"inflow: {len(plane['r'])} points; SU2 net mass flow {flows['mdot_net']:.4g} kg/s, "
         f"emitted (one-sided) {flows['mdot_inward']:.4g} kg/s")
-    if x_break is not None and x_c >= x_break:
-        log(f"WARNING: the forced plane is past the breakdown point ({x_break / D:.3g} D): "
-            f"SU2 is not reliable there")
 
     # ---- sanity-check report ---------------------------------------------------
     info = dict(case=name, gas=gas.species, vtu=vtu, module=module, thr=thr, opts=opts,

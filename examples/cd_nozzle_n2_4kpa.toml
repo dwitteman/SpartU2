@@ -39,12 +39,16 @@ n_radial_ext = 200            # lip -> chamber radius
 iterations = 25000
 
 [sparta]
-x_couple_D = 10               # forced, in throat diameters (5 mm); "auto" = couple_margin_D upstream of axis Kn_GLL breakdown
+x_couple_D = "auto"           # couple_margin_D upstream of breakdown, inside the nozzle if it happens there; or a number of D from the exit
 # couple_margin_D = 1          # with "auto": how far upstream of breakdown, in throat diameters
 breakdown_module = "handoff.breakdown_2d"   # Boyd's full Kn_GLL over each plane; default: axis only
 base_grid = [200, 100]
 cells_per_mfp = 3
 ppc_target = 20
-hold_steps = 25000            # transient hold before averaging; then the grid adapts to the particles
+hold_steps = 500000           # transient hold (~ one box transit) before averaging; then the grid adapts to the particles
+run_steps = 20000             # averaged run after the hold
+output_every = 20000          # flow dump interval; must divide hold_steps and run_steps
+restart_every = 50000         # restart file interval
+image_every = 20000           # image.<step>.ppm of log10 density during the hold (25 pictures)
 fnum = "auto"
 timestep_s = "auto"

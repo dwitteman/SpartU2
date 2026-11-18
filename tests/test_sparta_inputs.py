@@ -78,9 +78,29 @@ def test_hold_images_settings():
         hold_images({"sparta": {"image_every": 500, "image_avg_steps": 600}}, BOX, 25000, 5e22)
 
 
-def test_images_only_during_the_hold():
+def test_particle_images_are_the_default_with_walls_drawn():
     hold = adapt_hold({"sparta": {"hold_steps": 25000}})
     hold["images"] = hold_images({"sparta": {"image_every": 500}}, BOX, 25000, 5e22)
+    assert hold["images"]["style"] == "particles"
+    walls = dict(T=300.0)
+    text = in_run("case.toml", BOX, "N2", "n2", 1e17, 1e-8, 10000, hold=hold, walls=walls, **IO)
+    c = commands(text)
+    joined = text.replace("&\n", " ")  # SPARTA joins lines continued with &
+    dump = next(l for l in joined.splitlines() if l.startswith("dump            img image"))
+    assert "type type pdiam" in dump and "surf one" in dump and "grid" not in dump
+    assert "dump_modify img pad 7 backcolor black" in c
+    order = [r"dump img image", r"run 24000$", r"run 1000$", r"undump img$", r"adapt_grid"]
+    idx = [index_of(c, q) for q in order]
+    assert idx == sorted(idx)
+    assert not any(x.startswith(("unfix img", "uncompute img")) for x in c)
+    # no walls: no surf drawing
+    text = in_run("case.toml", BOX, "N2", "n2", 1e17, 1e-8, 10000, hold=hold, **IO)
+    assert "image" in text and "surf one" not in text
+
+
+def test_images_only_during_the_hold():
+    hold = adapt_hold({"sparta": {"hold_steps": 25000}})
+    hold["images"] = hold_images({"sparta": {"image_every": 500, "image_style": "density"}}, BOX, 25000, 5e22)
     text = in_run("case.toml", BOX, "N2", "n2", 1e17, 1e-8, 10000, hold=hold, **IO)
     c = commands(text)
     order = [r"fix img ave/grid all 1 100 500 v_img_lgn$", r"dump img image all 500 image\.\*\.ppm",

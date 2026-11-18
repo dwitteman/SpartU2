@@ -16,12 +16,14 @@ to the wall) as well as the plume, so breakdown inside a diverging section or a 
 found where it happens rather than reported at the exit.
 
 The coupling plane needs one number per axial station x. A plume always has broken-down
-gas somewhere on any plane (the lip, the edge of the jet, the near-vacuum background), so the
-station value is the Kn_GLL exceeded by a fraction `mass_fraction` (default 1%) of the mass
-flow through the plane. first_breakdown(x, kn, 0.05) is then the first plane where more than
-1% of the jet passes through gas with Kn_GLL > 0.05.
+gas somewhere on any plane (the wall boundary layer, the lip, the edge of the jet, the
+near-vacuum background), so the station value is the Kn_GLL exceeded by a fraction
+`mass_fraction` of the mass flow through the plane. The default 0.5 follows Bi et al.:
+first_breakdown(x, kn, 0.01) is then the first plane where half of the radial mass flow
+passes through gas with Kn_GLL > 0.01.
 
-Options come from the case file's [breakdown] section, e.g. mass_fraction = 0.01.
+Options come from the case file's [breakdown] section, e.g. mass_fraction = 0.01 for a
+stricter plane (1% of the flow over the threshold).
 
 Usage: python handoff/breakdown_2d.py CASE.toml [--runs RUNS_DIR] [--su2 FLOW.vtu]
 prints the station profile and where breakdown happens.
@@ -38,7 +40,7 @@ if __package__ in (None, ""):  # allow `python handoff/breakdown_2d.py` as well 
 from handoff.breakdown_gll import KN_BREAKDOWN, axis_profile, first_breakdown, kn_at  # noqa: F401  (API)
 
 KB = 1.380649e-23
-MASS_FRACTION = 0.01  # default fraction of the plane's mass flow allowed above the threshold
+MASS_FRACTION = 0.5  # default fraction of the plane's mass flow allowed above the threshold (Bi et al.)
 QUANTITIES = ("rho", "T", "V")  # order of the terms in the max, for reporting which one dominates
 
 

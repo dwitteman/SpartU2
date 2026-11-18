@@ -39,8 +39,8 @@ n_radial_ext = 200            # lip -> chamber radius
 iterations = 25000
 
 [sparta]
-x_couple_D = 10               # forced, in throat diameters (5 mm); "auto" = couple_margin_D upstream of axis Kn_GLL breakdown
-# couple_margin_D = 1          # with "auto": how far upstream of breakdown, in throat diameters
+x_couple_D = "auto"               # forced, in throat diameters (5 mm); "auto" = couple_margin_D upstream of axis Kn_GLL breakdown
+# couple_margin_D = "auto"          # with "auto": how far upstream of breakdown, in throat diameters
 breakdown_module = "handoff.breakdown_2d"   # Boyd's full Kn_GLL over each plane; default: axis only
 base_grid = [200, 100]
 cells_per_mfp = 3

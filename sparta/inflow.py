@@ -21,11 +21,13 @@ SECTION = "XLO"  # boundary-ID of the section in the inflow file
 
 def plane_radii(field, x_c, r_max, n_min=200):
     """Mesh radii for the inflow table: the SU2 node radii near x = x_c, plus a uniform
-    set of n_min points, clipped to [0, r_max]. Keeps SU2's resolution of the plume edge."""
+    set of n_min points and n_min points clustered towards r_max (the nozzle wall's boundary
+    layer, for a plane inside the nozzle), clipped to [0, r_max]. Keeps SU2's resolution of
+    the plume edge."""
     xs = np.unique(field.xy[:, 0])
     x_near = xs[np.argmin(np.abs(xs - x_c))]
     r = field.xy[np.abs(field.xy[:, 0] - x_near) < 1e-12, 1]
-    r = np.concatenate([r, np.linspace(0.0, r_max, n_min)])
+    r = np.concatenate([r, np.linspace(0.0, r_max, n_min), r_max * (1 - np.geomspace(1e-4, 1, n_min))])
     r = np.unique(np.clip(r, 0.0, r_max))
     return r[np.concatenate([[True], np.diff(r) > 1e-12 * max(r_max, 1e-30)])]
 

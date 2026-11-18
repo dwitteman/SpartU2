@@ -6,7 +6,10 @@ Needs the handoff (RUNS_DIR/<name>/handoff/, from handoff/handoff.py) and writes
 RUNS_DIR/<name>/sparta/.
 
 The DSMC domain starts at the coupling plane chosen by the handoff and fills the
-rest of the chamber. Its grid is refined so that every cell is smaller than the
+rest of the chamber. If the plane is inside the nozzle or capillary (x_c < 0), the
+domain includes the rest of it: the nozzle wall and the faceplate are written to
+nozzle.surf, read with `read_surf ... clip`, and are diffuse walls at
+[su2] wall_temp_K. Its grid is refined so that every cell is smaller than the
 local mean free path / cells_per_mfp, using the SU2 solution the handoff read.
 The handoff's inflow.sparta is copied in; in.sparta runs the coupled DSMC case,
 in.continue continues it from a restart file, in.grid only loads the grid.
@@ -26,6 +29,7 @@ from handoff.handoff import read_handoff
 from lib.common import die, get, load_case, log
 from lib.su2_field import Su2Field
 from sparta import grid as sgrid
+from sparta import surf as ssurf
 from sparta.gas import DATA, load_gas
 
 
@@ -52,8 +56,8 @@ def setup(case_path, runs_dir="runs") -> Path:
     ppc_target = get(case, "sparta", "ppc_target", 20)
     tau_frac = get(case, "sparta", "dt_tau_frac", 0.2)
     cell_frac = get(case, "sparta", "dt_cell_frac", 0.5)
-    if not 0 <= x_c < Lx:
-        die(f"handoff coupling plane x = {x_c*1e3:.3g} mm is outside the chamber: rerun handoff/handoff.py")
+    if not x_c < Lx:
+        die(f"handoff coupling plane x = {x_c*1e3:.3g} mm is past the chamber: rerun handoff/handoff.py")
 
     vtu = Path(ho["su2_vtu"])
     inflow_file = Path(runs_dir) / name / "handoff" / "inflow.sparta"
@@ -62,7 +66,17 @@ def setup(case_path, runs_dir="runs") -> Path:
 
     gas = load_gas(get(case, "gas", "species_file"))
     log(f"reading SU2 solution {vtu}")
-    field = Su2Field(vtu, xmin=-1e-9)  # chamber only (x >= exit plane)
+    field = Su2Field(vtu)  # whole SU2 domain: the nozzle wall comes from its outline
+    box = (x_c, Lx, 0.0, Rext)
+
+    # nozzle walls inside the box: the solid region gets no refinement and no particles
+    walls = None
+    solid = lambda x, y: np.zeros(np.shape(x), bool)
+    if x_c < 0:
+        x_w, r_w = ssurf.wall_profile(field, x_c)
+        walls = dict(T=float(get(case, "su2", "wall_temp_K")), pts=ssurf.outline(x_w, r_w, box),
+                     r_plane=float(r_w[0]), r_exit=float(r_w[-1]), n_wall=len(x_w) - 1)
+        solid = ssurf.solid_test(x_w, r_w)
 
     def props(rho, T, u, v):
         n = rho / gas.mass
@@ -71,9 +85,14 @@ def setup(case_path, runs_dir="runs") -> Path:
         return dict(n=n, T=T, lam=lam, tau=lam / cbar, speed=np.hypot(u, v) + cbar)
 
     def sampler(x, y):
-        return props(**field.sample(x, y))
+        p = props(**field.sample(x, y))
+        s = solid(x, y)  # inside the nozzle body: no gas
+        if s.any():
+            p.update(n=np.where(s, 0.0, p["n"]), T=np.where(s, 0.0, p["T"]),
+                     lam=np.where(s, np.inf, p["lam"]), tau=np.where(s, np.inf, p["tau"]),
+                     speed=np.where(s, 0.0, p["speed"]))
+        return p
 
-    box = (x_c, Lx, 0.0, Rext)
     inside = field.xy[:, 0] >= x_c
     nodes = props(**{q: a[inside] for q, a in field.nodes.items()})
     nodes.update(x=field.xy[inside, 0], y=field.xy[inside, 1])
@@ -89,14 +108,16 @@ def setup(case_path, runs_dir="runs") -> Path:
     d = g.data
     # with `global weight cell radius`, particles per cell = 2 pi n dy / fnum
     ndy = 2 * np.pi * d["n"] * dy
-    ref = g.level > 1 if (g.level > 1).any() else np.ones_like(g.level, bool)
+    gas_cell = d["n"] > 0  # cells whose centre is in the flow (not inside the nozzle body)
+    ref = gas_cell & (g.level > 1) if (gas_cell & (g.level > 1)).any() else gas_cell
     fnum_ppc = np.percentile(ndy[ref], 10) / ppc_target
     # memory budget: never more than max_particles at steady state (~100-200 bytes each)
     max_particles = float(get(case, "sparta", "max_particles", 5e6))
     fnum_mem = ndy.sum() / max_particles
     fnum_rec = max(fnum_ppc, fnum_mem)
-    dt_rec = float(np.min(np.minimum(tau_frac * d["tau"],
-                                     cell_frac * np.minimum(dx, dy) / d["speed"])))
+    with np.errstate(divide="ignore"):
+        dt_rec = float(np.min(np.minimum(tau_frac * d["tau"],
+                                         cell_frac * np.minimum(dx, dy) / d["speed"])))
     fnum = _auto(case, "fnum") or fnum_rec
     dt = _auto(case, "timestep_s") or dt_rec
     ppc = ndy / fnum
@@ -128,29 +149,41 @@ def setup(case_path, runs_dir="runs") -> Path:
     stem = Path(get(case, "gas", "species_file")).stem
     for ext in ("species", "vss"):
         shutil.copy(DATA / f"{stem}.{ext}", run_dir / f"{stem}.{ext}")
-    g.write(run_dir / "grid.sparta", {"lambda": d["lam"], "su2_nrho": d["n"]})
-    (run_dir / "in.grid").write_text(in_grid(case_path.name, box, gas.species, stem, fnum, dt))
+    # cells inside the nozzle body have no gas: lambda 0 there (SPARTA cannot read inf)
+    g.write(run_dir / "grid.sparta", {"lambda": np.where(np.isfinite(d["lam"]), d["lam"], 0.0), "su2_nrho": d["n"]})
+    if walls:
+        ssurf.write_surf(run_dir / "nozzle.surf", walls["pts"],
+                         header=f"Generated by sparta/setup.py from {case_path.name}: nozzle wall from the "
+                                f"coupling plane to the exit, and the faceplate.\nClosed outline, clipped "
+                                f"to the box by read_surf ... clip.")
+    elif (run_dir / "nozzle.surf").exists():
+        (run_dir / "nozzle.surf").unlink()  # from an earlier setup with the plane in the nozzle
+    (run_dir / "in.grid").write_text(in_grid(case_path.name, box, gas.species, stem, fnum, dt, walls))
     shutil.copy(inflow_file, run_dir / "inflow.sparta")
     io = dict(out_every=out_every, avg_steps=avg_steps, restart_every=restart_every)
     (run_dir / "in.sparta").write_text(in_run(case_path.name, box, gas.species, stem, fnum, dt,
-                                              run_steps, hold=hold, **io))
-    (run_dir / "in.continue").write_text(in_continue(case_path.name, stem, run_steps, **io))
+                                              run_steps, hold=hold, walls=walls, **io))
+    (run_dir / "in.continue").write_text(in_continue(case_path.name, stem, run_steps, walls=walls, **io))
 
     # ---- report -------------------------------------------------------------
     per_level = np.bincount(g.level)[1:]
     rep = [
         f"case {name}: {gas.species}, D = {D*1e3:g} mm",
-        f"domain x = [{x_c*1e3:.4g}, {Lx*1e3:.4g}] mm (coupling plane at {x_c/D:g} D), "
+        f"domain x = [{x_c*1e3:.4g}, {Lx*1e3:.4g}] mm (coupling plane at {x_c/D:.4g} D), "
         f"r = [0, {Rext*1e3:.4g}] mm",
+        (f"walls: nozzle from r = {walls['r_plane']*1e3:.4g} mm at the plane to {walls['r_exit']*1e3:.4g} mm "
+         f"at the exit ({walls['n_wall']} lines), and the faceplate; diffuse at {walls['T']:g} K (nozzle.surf)"
+         if walls else "walls: none (the plane is in the chamber; xlo is open)"),
         f"grid: {len(g.level)} cells over {g.nlevels} levels "
         f"({', '.join(f'L{i+1}:{c}' for i, c in enumerate(per_level))})",
         f"  cell size {np.min(dx)*1e6:.3g} um (finest) to {np.max(dx)*1e6:.3g} um (base)",
-        f"  mean free path in domain {d['lam'].min()*1e6:.3g} um to {d['lam'].max()*1e3:.3g} mm",
+        f"  mean free path in domain {d["lam"].min()*1e6:.3g} um to {d["lam"][gas_cell].max()*1e3:.3g} mm",
         f"fnum     {fnum:.3g}" + ("" if fnum == fnum_rec else f"  (recommended {fnum_rec:.3g})")
         + (f"  [raised from {fnum_ppc:.3g} to keep <= {max_particles:.3g} particles]"
            if fnum_mem > fnum_ppc else ""),
         f"  particles/cell: refined cells median {np.median(ppc[ref]):.3g}, "
-        f"10th pct {np.percentile(ppc[ref], 10):.3g}; all cells min {ppc.min():.3g}",
+        f"10th pct {np.percentile(ppc[ref], 10):.3g}; all gas cells min {ppc[gas_cell].min():.3g}"
+        + (f"; {int((~gas_cell).sum())} cells inside the nozzle body" if walls else ""),
         f"  steady-state particles ~ {ppc.sum():.3g} (~{ppc.sum() * 200 / 1e9:.2g} GB at 200 B each)",
         f"timestep {dt:.3g} s" + ("" if dt == dt_rec else f"  (recommended {dt_rec:.3g})"),
         f"inflow (from the handoff, {ho['mode']} plane): SU2 net mass flow {ho['mdot_net']:.4g} kg/s, "
@@ -161,8 +194,10 @@ def setup(case_path, runs_dir="runs") -> Path:
             if hold["adapt"] else "no grid adaptation")
          if hold["steps"] else "hold: none"),
         (f"images: image.<step>.ppm every {hold['images']['every']} steps of the hold, "
-         f"{hold['images']['width']} x {hold['images']['height']} px, log10 n from "
-         f"{hold['images']['lo']:g} to {hold['images']['hi']:g}" if hold["images"] else "images: none"),
+         f"{hold['images']['width']} x {hold['images']['height']} px, "
+         + ("particles (red on black)" if hold["images"]["style"] == "particles" else
+            f"log10 n from {hold['images']['lo']:g} to {hold['images']['hi']:g}")
+         if hold["images"] else "images: none"),
         f"run: {run_steps} steps ({run_steps * dt:.3g} s); output every {out_every} (averaged over the "
         f"last {avg_steps}); restart file every {restart_every}; "
         f"one transit of the box at the max inflow speed takes {(Lx - x_c) / max(ho['u_max'], 1.0) / dt:.3g} steps",
@@ -172,10 +207,10 @@ def setup(case_path, runs_dir="runs") -> Path:
     warn = []
     if g.unresolved:
         warn.append(f"{g.unresolved} cells still exceed lambda/{k} at the level limit "
-                    f"(worst by {g.worst:.2g}x): coarsen base_grid, or move the coupling "
-                    f"plane downstream")
-    if "x_breakdown_m" in ho and x_c >= ho["x_breakdown_m"]:
-        warn.append(f"axis Kn_GLL first exceeds {ho['kn_threshold']} at {ho['x_breakdown_m']/D:.3g} D, "
+                    f"(worst by {g.worst:.2g}x): use a finer base_grid, or a SPARTA build with "
+                    f"64-bit cell IDs (-DSPARTA_BIGBIG) and a higher max_levels")
+    if "x_breakdown_m" in ho and x_c > ho["x_breakdown_m"]:
+        warn.append(f"Kn_GLL first exceeds {ho['kn_threshold']} at {ho['x_breakdown_m']/D:.3g} D, "
                     f"upstream of the coupling plane: SU2 is not reliable there, use "
                     f"x_couple_D < {ho['x_breakdown_m']/D:.3g} or \"auto\"")
     if ppc.sum() > 1.01 * max_particles:
@@ -194,7 +229,28 @@ def setup(case_path, runs_dir="runs") -> Path:
     return run_dir
 
 
-def in_grid(case_name, box, species, stem, fnum, dt) -> str:
+def _walls(walls) -> str:
+    """Nozzle wall + faceplate surface and its collision model (empty without walls)."""
+    if not walls:
+        return ""
+    return f"""
+# nozzle wall (coupling plane -> exit) and faceplate, diffuse at the SU2 wall temperature
+read_surf       nozzle.surf clip
+surf_collide    wall diffuse {walls['T']:g} 1.0
+surf_modify     all collide wall
+"""
+
+
+def _walls_restart(walls) -> str:
+    """After read_restart: the surfaces are in the restart file, their collision model is not."""
+    if not walls:
+        return ""
+    return f"""surf_collide    wall diffuse {walls['T']:g} 1.0
+surf_modify     all collide wall
+"""
+
+
+def in_grid(case_name, box, species, stem, fnum, dt, walls=None) -> str:
     xlo, xhi, ylo, yhi = box
     return f"""\
 # Generated by sparta/setup.py from {case_name} -- edit the case file, not this.
@@ -213,7 +269,7 @@ create_box      {xlo:.10g} {xhi:.10g} {ylo:.10g} {yhi:.10g} -0.5 0.5
 global          gridcut 0.0
 read_grid       grid.sparta custom lambda float 0 custom su2_nrho float 0
 balance_grid    rcb cell
-
+{_walls(walls)}
 global          weight cell radius
 global          fnum {fnum:.4g}
 species         {stem}.species {species}
@@ -254,6 +310,9 @@ def hold_images(case, box, hold_steps, n_max):
     every = int(get(case, "sparta", "image_every", 0))
     if not every:
         return None
+    style = get(case, "sparta", "image_style", "particles")
+    if style not in ("particles", "density"):
+        die('sparta.image_style must be "particles" or "density"')
     if every < 0 or not hold_steps:
         die("sparta.image_every needs a positive value and a transient hold (hold_steps > 0)")
     xlo, xhi, ylo, yhi = box
@@ -268,11 +327,27 @@ def hold_images(case, box, hold_steps, n_max):
     lo, hi = (float(v) for v in get(case, "sparta", "image_log_range", [hi_auto - 5, hi_auto]))
     if not lo < hi:
         die("sparta.image_log_range must be [low, high] with low < high (log10 of 1/m3)")
-    return dict(every=every, avg=avg, width=width, height=height, zoom=zoom, lo=lo, hi=hi)
+    # particles: one dot each, image_pdiam_px pixels across (pdiam is in metres)
+    px = Ly / height
+    pdiam = float(get(case, "sparta", "image_pdiam_px", 1.5)) * px
+    return dict(style=style, every=every, avg=avg, width=width, height=height, zoom=zoom, lo=lo, hi=hi,
+                pdiam=pdiam, sdiam=2 * px / min(Lx, Ly))
 
 
-def _images_on(img) -> str:
-    """Start the hold snapshots: log10 number density per cell, averaged, as PPM images."""
+def _images_on(img, walls=None) -> str:
+    """Start the hold snapshots as PPM images: the particles (stock SPARTA look: red dots on
+    black, walls grey), or log10 number density per cell, averaged."""
+    if img.get("style", "particles") == "particles":
+        surf = f" &\n                surf one {img['sdiam']:.3g}" if walls else ""
+        return f"""# ---- images of the transient hold -------------------------------------------------------
+# image.<step>.ppm every {img['every']} steps: every particle as a red dot ({img['pdiam']:.3g} m across) on black{", nozzle wall grey" if walls else ""}.
+# PPM because this SPARTA build has no JPEG/PNG; convert with ImageMagick (sparta/README.md).
+# zoom: the 2D box is 1 m deep in z and the picture is scaled to that, so zoom fits it to the domain.
+dump            img image all {img['every']} image.*.ppm type type pdiam {img['pdiam']:.4g} &
+                size {img['width']} {img['height']} zoom {img['zoom']:.6g} box no 0.0{surf}
+dump_modify     img pad 7 backcolor black
+
+"""
     return f"""# ---- images of the transient hold -------------------------------------------------------
 # image.<step>.ppm every {img['every']} steps: log10 number density per cell, averaged over the
 # {img['avg']} steps before each image, white = 1e{img['lo']:g} /m3 or less, navy = 1e{img['hi']:g} /m3 or more.
@@ -289,7 +364,11 @@ dump_modify     img pad 7 backcolor white &
 """
 
 
-_IMAGES_OFF = """# end of the hold: stop the images (before the grid changes)
+def _images_off(img) -> str:
+    """End of the hold: stop the images (before the grid changes)."""
+    if img.get("style", "particles") == "particles":
+        return "# end of the hold: stop the images\nundump          img\n\n"
+    return """# end of the hold: stop the images (before the grid changes)
 undump          img
 unfix           img
 variable        img_lgn delete
@@ -325,12 +404,12 @@ run             1
 """
 
 
-def _hold_block(hold) -> str:
+def _hold_block(hold, walls=None) -> str:
     """Transient hold, then optional one-time grid adaptation to where the particles are."""
     if not hold["steps"]:
         return ""
     img = hold.get("images")
-    on, off = (_images_on(img), _IMAGES_OFF) if img else ("", "")
+    on, off = (_images_on(img, walls), _images_off(img)) if img else ("", "")
     txt = f"""\
 {on}# ---- transient hold: let the jet fill the box before averaging -------------------------
 """
@@ -358,7 +437,7 @@ write_restart   restart.*.sparta
 
 
 def in_run(case_name, box, species, stem, fnum, dt, run_steps, out_every, avg_steps, restart_every,
-           hold=None) -> str:
+           hold=None, walls=None) -> str:
     """Coupled DSMC run from an empty box: SU2 inflow on xlo; an optional transient hold
     with grid adaptation; then run_steps with averaged output every out_every steps;
     restart files every restart_every steps and at the end."""
@@ -366,7 +445,7 @@ def in_run(case_name, box, species, stem, fnum, dt, run_steps, out_every, avg_st
     xlo, xhi, ylo, yhi = box
     return f"""\
 # Generated by sparta/setup.py from {case_name} -- edit the case file, not this.
-# DSMC of the chamber downstream of the coupling plane (xlo), fed by the SU2 state there.
+# DSMC downstream of the coupling plane (xlo), fed by the SU2 state there.
 #   mpirun -n N spa_mpi -in in.sparta   ->  log.sparta, flow.<step>.dump, restart.<step>.sparta
 # Continue later with in.continue.
 
@@ -381,7 +460,7 @@ create_box      {xlo:.10g} {xhi:.10g} {ylo:.10g} {yhi:.10g} -0.5 0.5
 global          gridcut 0.0
 read_grid       grid.sparta custom lambda float 0 custom su2_nrho float 0
 balance_grid    rcb cell
-
+{_walls(walls)}
 global          weight cell radius
 global          fnum {fnum:.4g}
 species         {stem}.species {species}
@@ -391,7 +470,7 @@ timestep        {dt:.4g}
 
 fix             inflow emit/face/file gas xlo inflow.sparta XLO
 {_housekeeping(restart_every, max(out_every // 10, 1))}
-{_hold_block(hold)}# ---- run with averaged output ------------------------------------------------------------
+{_hold_block(hold, walls)}# ---- run with averaged output ------------------------------------------------------------
 {_FIRST_STEP_NOTE}
 {_averaging(out_every, avg_steps)}
 run             {run_steps - 1}
@@ -399,7 +478,7 @@ write_restart   restart.*.sparta
 """
 
 
-def in_continue(case_name, stem, run_steps, out_every, avg_steps, restart_every) -> str:
+def in_continue(case_name, stem, run_steps, out_every, avg_steps, restart_every, walls=None) -> str:
     """Continue a run from its latest restart file, up to timestep `target`."""
     return f"""\
 # Generated by sparta/setup.py from {case_name} -- edit the case file, not this.
@@ -417,7 +496,7 @@ seed            ${{seed}}
 
 read_restart    restart.*.sparta balance rcb cell
 collide         vss gas {stem}.vss
-fix             inflow emit/face/file gas xlo inflow.sparta XLO
+{_walls_restart(walls)}fix             inflow emit/face/file gas xlo inflow.sparta XLO
 {_housekeeping(restart_every, max(out_every // 10, 1))}
 {_FIRST_STEP_NOTE}
 {_averaging(out_every, avg_steps)}

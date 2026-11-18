@@ -15,17 +15,28 @@ def test_auto_plane_is_margin_upstream_of_breakdown():
     assert choose_plane("auto", D, x_break=6 * D, margin_D=2.5) == pytest.approx(3.5 * D)
 
 
-def test_forced_plane_ignores_breakdown():
-    assert choose_plane(10, D, x_break=6 * D) == pytest.approx(10 * D)
+def test_forced_plane_up_to_breakdown_is_kept_past_it_refused():
+    assert choose_plane(4.0, D, x_break=6 * D) == pytest.approx(4 * D)
     assert choose_plane(4.0, D, x_break=None) == pytest.approx(4 * D)
+    assert choose_plane(-20, D, x_break=-10 * D, x_min=-100 * D) == pytest.approx(-20 * D)
+    with pytest.raises(SystemExit, match="past the breakdown point"):
+        choose_plane(10, D, x_break=6 * D)
+    with pytest.raises(SystemExit, match="past the breakdown point"):
+        choose_plane(0.5, D, x_break=-70 * D)
+
+
+def test_auto_plane_follows_breakdown_into_the_nozzle():
+    # breakdown just past a throat at -72 D: the plane goes 1 D upstream of it, inside the nozzle
+    assert choose_plane("auto", D, x_break=-70 * D, margin_D=1.0, x_min=-108 * D) == pytest.approx(-71 * D)
+    assert choose_plane("auto", D, x_break=0.5 * D, margin_D=1.0) == pytest.approx(-0.5 * D)
 
 
 def test_auto_without_breakdown_or_room_stops():
     with pytest.raises(SystemExit, match="no breakdown point"):
         choose_plane("auto", D, x_break=None)
-    with pytest.raises(SystemExit, match="within couple_margin_D"):
-        choose_plane("auto", D, x_break=0.5 * D, margin_D=1.0)
-    with pytest.raises(SystemExit, match="outside the chamber"):
+    with pytest.raises(SystemExit, match="outside the SU2 domain"):
+        choose_plane("auto", D, x_break=-107.5 * D, margin_D=1.0, x_min=-108 * D)
+    with pytest.raises(SystemExit, match="outside the SU2 domain"):
         choose_plane(100, D, x_break=None, x_max=0.01)
 
 

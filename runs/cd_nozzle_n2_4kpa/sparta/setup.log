@@ -1,0 +1,15 @@
+case cd_nozzle_n2_4kpa: N2, D = 0.5 mm
+domain x = [-35.78, 120] mm (coupling plane at -71.56 D), r = [0, 60] mm
+walls: nozzle from r = 0.25 mm at the plane to 6.5 mm at the exit (329 lines), and the faceplate; diffuse at 300.15 K (nozzle.surf)
+grid: 67934 cells over 6 levels (L1:19646, L2:358, L3:1628, L4:5694, L5:11648, L6:28960)
+  cell size 24.3 um (finest) to 779 um (base)
+  mean free path in domain 2.28 um to 67.2 mm
+fnum     5.73e+16
+  particles/cell: refined cells median 27.4, 10th pct 20; all gas cells min 1.33; 5529 cells inside the nozzle body
+  steady-state particles ~ 2.26e+06 (~0.45 GB at 200 B each)
+timestep 1.04e-09 s
+inflow (from the handoff, auto plane): SU2 net mass flow 1.003e-06 kg/s, emitted (one-sided) 1.211e-06 kg/s; axis Kn_GLL at the plane 0.00786
+hold: 500000 steps (0.000522 s) without output, then adapt the grid to the particle count averaged over the last 1000 steps (refine > 80, coarsen < 20 particles)
+images: image.<step>.ppm every 20000 steps of the hold, 1600 x 616 px, log10 n from 19 to 24
+run: 20000 steps (2.09e-05 s); output every 20000 (averaged over the last 10000); restart file every 50000; one transit of the box at the max inflow speed takes 4.53e+05 steps
+WARNING: 11346 cells still exceed lambda/3 at the level limit (worst by 32x): use a finer base_grid, or a SPARTA build with 64-bit cell IDs (-DSPARTA_BIGBIG) and a higher max_levels

@@ -13,7 +13,7 @@ from handoff import breakdown_gll as gll
 
 STATIONS_D = (0, 0.5, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 50, 80, 120, 200)
 NOZZLE_FRACTIONS = (1, 0.75, 0.5, 0.25, 0.1)  # nozzle/capillary rows, as fractions of its length before the exit
-MDOT_TOL = 0.05  # mass-flow conservation between the exit and the plane
+MDOT_TOL = 0.05  # mass-flow conservation between the SU2 inlet (or the exit) and the plane
 
 
 def analyse(field, gas, x_c, thr):
@@ -56,10 +56,11 @@ def checks(a, x_c, x_break, flows, plane, mass_fraction, thr):
     out.append((f <= mass_fraction,
                 f"{f:.2%} of the mass flow through the plane has Kn_GLL(2D) > {thr} "
                 f"(limit {mass_fraction:.0%})"))
-    m0, mc = a["mdot"][a["i0"]], a["mdot"][ic]
+    i_ref, ref = (0, "the nozzle inlet") if a["xs"][0] < 0 else (a["i0"], "the exit")
+    m0, mc = a["mdot"][i_ref], a["mdot"][ic]
     dev = abs(mc / m0 - 1) if m0 else np.inf
     out.append((dev <= MDOT_TOL,
-                f"SU2 mass flow: {m0:.4g} kg/s at the exit, {mc:.4g} kg/s at the plane "
+                f"SU2 mass flow: {m0:.4g} kg/s at {ref}, {mc:.4g} kg/s at the plane "
                 f"({dev:.1%} apart, limit {MDOT_TOL:.0%})"))
     ratio = flows["mdot_inward"] / flows["mdot_net"] if flows["mdot_net"] else np.inf
     out.append((ratio < 1.5,
@@ -157,6 +158,7 @@ def figure(path, a, info):
     ext = min(xy[:, 0].max(), max(3 * x_c, 20 * D))
     # include the nozzle from its throat (or the last ext of a capillary) when there is one
     x_lo = 0.0 if xy[:, 0].min() >= 0 else max(xy[:, 0].min(), a["x_throat"] if a["x_throat"] is not None else -ext)
+    x_lo = max(xy[:, 0].min(), min(x_lo, x_c - 2 * D))  # keep a plane inside the nozzle in view
     rext = min(xy[:, 1].max(), 0.6 * ext)
     m = ax[0, 0]
     tri = Triangulation(xy[:, 0] * 1e3, xy[:, 1] * 1e3, info["simplices"])

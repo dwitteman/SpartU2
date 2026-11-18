@@ -109,10 +109,15 @@ Check in `log.sparta` after the hold:
 
 With `image_every` set, `in.sparta` writes a picture of the transient every `image_every`
 steps of the hold, so you can watch the jet fill the box:
-- **What it shows:** log10 of the number density in each grid cell, averaged over the
-  `image_avg_steps` (default 100) steps before each image. White is `image_log_range[0]`
-  or less, navy is `image_log_range[1]` or more. By default the range is the five decades
-  below the highest SU2 density in the domain (1e18 to 1e23 /m³ for the N₂ nozzle).
+- **What it shows,** chosen with `image_style`:
+  - `"particles"` (default): SPARTA's stock picture, every simulated particle as a red dot
+    (`image_pdiam_px`, default 1.5 pixels, across) on black, with the nozzle wall and faceplate
+    in grey when the domain includes them.
+  - `"density"`: log10 of the number density in each grid cell, averaged over the
+    `image_avg_steps` (default 100) steps before each image. White is `image_log_range[0]`
+    or less, navy is `image_log_range[1]` or more. By default the range is the five decades
+    below the highest SU2 density in the domain (1e18 to 1e23 /m³ for the N₂ nozzle). Each
+    cell is one flat colour, so refined and coarse cells show as blocks.
 - **Files:** `image.<step>.ppm`, `image_width` (default 1600) pixels wide, with the height
   following the domain's aspect ratio. PPM because this SPARTA build has no JPEG/PNG
   library. Each is about 4 MB.
@@ -188,11 +193,24 @@ for large chambers it is tens of thousands.
 
 | | |
 |---|---|
-| x | from the coupling plane x_c = `x_couple_D`·D to `chamb_length_cm` |
+| x | from the coupling plane x_c (from the handoff) to `chamb_length_cm` |
 | r | from 0 to `chamb_height_cm` |
 | `xlo` | coupling plane: open, and carries the SU2 inflow |
 | `ylo` | axis (`a`, axisymmetric) |
 | `xhi`, `yhi` | open, matching the SU2 outlet |
+| walls | only when x_c < 0 (the plane is inside the nozzle or capillary): the wall from x_c to the exit and the faceplate (x = 0, lip to chamber radius), diffuse at `[su2] wall_temp_K` |
+
+**Plane inside the nozzle.** Setup writes the nozzle body as one closed outline,
+`nozzle.surf`, taken from the SU2 mesh outline and extended past the box, and `in.sparta`
+reads it with `read_surf nozzle.surf clip` (SPARTA trims it at the box edges). Cells inside
+the body get no refinement and no particles (they are left out of the fnum statistics), and
+the inflow table ends at the wall radius on the plane. `fix emit/face/file` emits nothing
+from faces beyond the table or from cell faces touching the solid. After `read_restart`,
+`in.continue` sets `surf_collide` again, since restart files don't store it.
+
+The throat is the densest part of the flow, so a plane there sets the finest cells and the
+timestep. Expect many more levels than the 6 a 32-bit SPARTA build allows (see below) and a
+timestep of order 1e-10 s, with millions of steps for gas to cross the chamber.
 
 ### Grid
 
@@ -270,8 +288,8 @@ Setup reports both mass flows. In the N₂ nozzle case, the 0.1 Pa background ov
 The handoff computes the gradient-length Knudsen number, either Kn_GLL = λ|dρ/dx|/ρ on the
 SU2 axis (`breakdown_gll`) or Boyd's full 2D form over each plane (`breakdown_2d`). With
 `x_couple_D = "auto"` it puts the plane `couple_margin_D` diameters upstream of where it first
-goes above `kn_breakdown` (default 0.01); with a number it uses that and warns if the plane
-is past breakdown. Its `report.txt` always checks the plane with the 2D form. Past that point the NS solution can't be trusted as an
+goes above `kn_breakdown` (default 0.01), inside the nozzle if that is where it happens;
+a number is used as given unless it is past breakdown, which the handoff refuses. Its `report.txt` always checks the plane with the 2D form. Past that point the NS solution can't be trusted as an
 inflow. For the 0.4 mm He capillary at 1 bar, breakdown is at about 4.7 D, so `x_couple_D = 4`.
 See [handoff/README.md](../handoff/README.md).
 
@@ -321,10 +339,12 @@ timestep_s = "auto"            # or a number; optional
 #                              # default run_steps, or gcd(hold_steps, run_steps) with a hold
 # average_steps = 500          # average over the last this many steps before each dump; optional, default output_every/2
 # restart_every = 5000         # write restart.<step>.sparta every this many steps; optional, default run_steps
-# image_every = 500            # image.<step>.ppm of log10 density every this many hold steps; optional, default 0 (off)
-# image_avg_steps = 100        # average the density over this many steps before each image; optional
+# image_every = 500            # image.<step>.ppm every this many hold steps; optional, default 0 (off)
+# image_style = "particles"    # "particles" (red dots on black) or "density" (log10 n per cell); optional
+# image_pdiam_px = 1.5         # particles: dot size in pixels; optional
+# image_avg_steps = 100        # density: average over this many steps before each image; optional
 # image_width = 1600           # pixels; the height follows the domain's aspect ratio; optional
-# image_log_range = [18, 23]   # log10 n [1/m3] for white and navy; optional, default 5 decades below the SU2 maximum
+# image_log_range = [18, 23]   # density: log10 n [1/m3] for white and navy; optional, default 5 decades below the SU2 maximum
 ```
 
 The coupling-plane keys (`x_couple_D`, `couple_margin_D`, `kn_breakdown`, `breakdown_module`)
@@ -342,6 +362,7 @@ The `[case]`, `[geometry]` and `[gas]` sections are described in the
 | `setup.py` | command-line entry point: domain, grid, fnum/dt, input files; reads the handoff |
 | `inflow.py` | samples SU2 on the coupling plane, writes the `fix emit/face/file` table, Maxwellian fluxes (used by the handoff) |
 | `grid.py` | refinement (`build`), SPARTA cell IDs, `read_grid` file writer |
+| `surf.py` | nozzle wall + faceplate outline (`nozzle.surf`) when the plane is inside the nozzle |
 | `gas.py` | reads `.species`/`.vss` files; VSS mean free path, viscosity and mean thermal speed |
 | `data/` | `he`, `ar`, `d2` and `n2` species and VSS files |
 | `../handoff/breakdown_gll.py` | Kn_GLL breakdown parameter (default `breakdown_module`); see [handoff/README.md](../handoff/README.md) |

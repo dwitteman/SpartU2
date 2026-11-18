@@ -1,0 +1,19 @@
+# Species data
+
+# ID
+# Molwt (amu)
+# Molmass (kg)
+# Rotational dof
+# RotRel
+# Vibrational dof
+# VibRel
+# VibTemp (K)
+# species wt
+# charge
+
+# RotRel and VibRel are relaxation PROBABILITIES per collision (1/Z): SPARTA relaxes a
+# mode when rotrel >= uniform random number (collide_vss.cpp).
+# N2: Z_rot = 5 (RotRel 0.2) and VibRel / theta_v = 3371 K as in SPARTA's data/air.species.
+# Vibration is effectively frozen below ~1000 K.
+
+N2  28.0134   4.6518E-26  2    0.2   2    1.90114E-5    3371.0    1.0      0.0

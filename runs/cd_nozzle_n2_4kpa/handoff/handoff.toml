@@ -1,12 +1,13 @@
 # Written by handoff/handoff.py from case.toml; read by sparta/setup.py
 [handoff]
 su2_vtu = "/home/dan/sim/SpartU2/runs/cd_nozzle_n2_4kpa/su2/flow.vtu"
-mode = "forced"
-x_couple_m = 0.005
-x_couple_D = 10
-kn_at_plane = 7.8568
+mode = "auto"
+x_couple_m = -0.03578160602
+x_couple_D = -71.5632
+r_wall_m = 0.0002500000119      # radius of the flow on the plane (nozzle wall, or chamber height)
+kn_at_plane = 0.00785745
 kn_threshold = 0.01
-x_breakdown_m = -0.03745098785
-mdot_net = 1.34456e-06       # kg/s through the plane (SU2)
-mdot_inward = 3.23599e-06    # kg/s emitted by SPARTA (one-sided flux)
-u_max = 339.3
+x_breakdown_m = -0.03528160602
+mdot_net = 1.00289e-06       # kg/s through the plane (SU2)
+mdot_inward = 1.21092e-06    # kg/s emitted by SPARTA (one-sided flux)
+u_max = 329.11

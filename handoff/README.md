@@ -31,13 +31,14 @@ Two versions, chosen with `breakdown_module`:
 | Module | Kn_GLL | One number per x, used to place the plane |
 |---|---|---|
 | `handoff.breakdown_gll` (default) | λ\|dρ/dx\|/ρ, density only, on the SU2 axis nodes | Kn on the axis |
-| `handoff.breakdown_2d` | Boyd's full form at every SU2 node: λ·max(\|∇ρ\|/ρ, \|∇T\|/T, \|∇V\|/max(V, a)) | the Kn exceeded by `mass_fraction` (default 1%) of the mass flow through the plane |
+| `handoff.breakdown_2d` | Boyd's full form at every SU2 node: λ·max(\|∇ρ\|/ρ, \|∇T\|/T, \|∇V\|/max(V, a)) | the Kn exceeded by `mass_fraction` (default 50%, as Bi et al.) of the mass flow through the plane |
 
 Both cover the **whole SU2 domain**, from the nozzle or capillary inlet (x < 0) through the
 chamber, so breakdown inside a diverging section or a tube is reported where it happens
-(a negative x), not at the exit. The coupling plane itself must still be in the chamber
-(x ≥ 0), since the DSMC domain has no nozzle walls: with `"auto"`, breakdown inside the
-nozzle stops the handoff with a message, and you force the plane instead.
+(a negative x), not at the exit. The coupling plane follows it: with `"auto"` it goes
+`couple_margin_D` upstream of breakdown, inside the nozzle or capillary if that is where
+breakdown happens. The DSMC domain then includes the rest of the nozzle, with its wall
+and the faceplate as SPARTA surfaces (see [sparta/README.md](../sparta/README.md#domain)).
 
 In `breakdown_2d`:
 - **Gradients** come from the SU2 mesh itself: the exact gradient of the linear interpolant on each
@@ -91,19 +92,22 @@ of the jet would need DSMC from inside the nozzle.
 
 ```toml
 [sparta]
-x_couple_D = "auto"            # or a number: force the plane, in throat diameters past the exit
+x_couple_D = "auto"            # or a number: force the plane, in throat diameters from the exit (negative inside)
 couple_margin_D = 1            # with "auto": plane this many D upstream of breakdown; optional
 kn_breakdown = 0.01            # Kn_GLL threshold; optional, default the module's KN_BREAKDOWN (0.01)
 breakdown_module = "handoff.breakdown_gll"   # or "handoff.breakdown_2d"; optional
 
 [breakdown]                    # options passed to the module; optional
-mass_fraction = 0.01           # breakdown_2d: share of the plane's mass flow allowed over the threshold
+mass_fraction = 0.5            # breakdown_2d: share of the plane's mass flow allowed over the threshold
 ```
 
 - **`"auto"`** (the default) puts the plane `couple_margin_D` throat diameters upstream of the
-  module's first breakdown point. It stops with a message if there is none, or if it is closer
-  to the exit than the margin.
-- **A number** forces the plane there; the handoff warns if that is past the breakdown point.
+  module's first breakdown point, wherever that is. It stops with a message if there is none,
+  or if the plane would fall before the SU2 inlet.
+- **A number** forces the plane there, but not past the breakdown point: the handoff refuses
+  a forced plane further downstream than where SU2 stops being valid.
+- **`mass_fraction`:** the default 0.5 follows Bi et al., who put the plane where half of the
+  radial mass flow is over Kn_GLL = 0.01. Use 0.01 for a stricter plane (1% of the flow over).
 - **Threshold:** the default 0.01 follows Bi et al.; Boyd, Chen & Chandler (1995) used 0.05.
 
 ## Code
