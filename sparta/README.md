@@ -1,12 +1,12 @@
 # SPARTA stage
 
 Builds the DSMC domain downstream of the coupling plane, a grid sized from the
-[SU2 solution](../su2/README.md), the SU2 inflow on the coupling plane, and a SPARTA run
-input.
+[SU2 solution](../su2/README.md), and the SPARTA input files. The coupling plane and the
+inflow come from the [handoff](../handoff/README.md), which must run first.
 
 **Status:**
 - **Inflow:** checked against SPARTA on a synthetic case (see below).
-- **`in.sparta`:** written but not yet run on a real case.
+- **`in.sparta`:** run on the N₂ CD nozzle for 26,000 steps (25,000-step hold, then adaptation).
 
 Run all commands from the repo root. For the overall workflow, see the
 [main README](../README.md).
@@ -14,18 +14,18 @@ Run all commands from the repo root. For the overall workflow, see the
 ## Set up
 
 ```bash
-python sparta/setup.py my_case.toml               # reads runs/<name>/su2/flow.vtu
-python sparta/setup.py my_case.toml --su2 other/flow.vtu
+python sparta/setup.py my_case.toml                  # stage sparta_setup in run_case.sh
 python sparta/setup.py my_case.toml --runs /scratch/runs
 ```
 
-This needs a converged SU2 solution and numpy/scipy (`pip install -r requirements.txt`).
+This reads `runs/<name>/handoff/handoff.toml` for the coupling plane and the SU2 file, copies
+the handoff's `inflow.sparta`, and needs numpy/scipy (`pip install -r requirements.txt`).
 It prints a summary, also saved to `setup.log`:
 - domain, cells per level and cell sizes;
 - fnum, particle count and memory estimate, and timestep;
-- the inflow: number of points, and the SU2 net and emitted mass flow through the plane;
+- the inflow mass flows and Kn_GLL at the plane (from the handoff);
 - run length compared with one transit of the box;
-- the Knudsen number at the coupling plane, and any warnings.
+- any warnings.
 
 Then check that SPARTA reads the grid:
 
@@ -39,25 +39,17 @@ way to plot the grid.
 ## Run
 
 ```bash
-python sparta/run.py runs/<name>/sparta            # ranks from [sparta] nprocs -> sparta.log, flow.<step>.dump
-python sparta/run.py runs/<name>/sparta -n 4 --max-mem-gb 4
-python sparta/run.py runs/<name>/sparta -n 1 --input in.grid   # just load the grid
+CASE=my_case.toml STAGES=sparta NP=18 bash run_case.sh   # or qsub -v CASE=...,STAGES=sparta run_case.sh
+cd runs/<name>/sparta && mpirun -np 18 spa_mpi -in in.sparta -screen none   # the same, by hand
 ```
 
-`run.py` has two memory guards, so a run can't exhaust RAM and take WSL down:
-- **Before the run:** it refuses to start if the particle estimate in `setup.log` (about
-  200 B per particle) exceeds the limit. Pass `--force` to override.
-- **During the run:** it checks the total resident memory of all SPARTA ranks every second,
-  and kills them all if it goes over the limit.
+SPARTA writes `log.sparta`, `flow.<step>.dump` and `restart.<step>.sparta` in the run directory.
 
-The limit is `--max-mem-gb`, or `[sparta] max_mem_gb`, or else half the machine's RAM.
-Binaries come from `SPA_MPI`/`SPA_SERIAL`, then `PATH`, then
-`~/code/sparta-24Sep2025/src`.
-
-> **Check `setup.log` first.** The steady-state particle count and memory estimate are
-> printed there. The estimate assumes the DSMC density matches SU2's. If SU2's chamber
-> hasn't filled yet, the real DSMC count will be higher. On a 16 GB WSL machine, keep
-> `max_particles` at a few million.
+> **Check `setup.log` first.** The steady-state particle count and memory estimate (about
+> 200 B per particle) are printed there; request at least that much memory from PBS. The
+> estimate assumes the DSMC density matches SU2's. If SU2's chamber hasn't filled yet, the
+> real DSMC count will be higher. On a 16 GB WSL machine, keep `max_particles` at a few
+> million. The N₂ nozzle run peaked at 3.3 M particles, about 220 MB per rank on 18 ranks.
 
 `in.sparta`:
 - **Inflow:** emits the inflow on `xlo` every step.
@@ -98,8 +90,13 @@ Limits of the adaptation:
 
   To refine further, use a coarser `base_grid` or build SPARTA with 64-bit cell IDs (see Grid).
 - **SU2 columns:** new cells get 0 in the SU2 columns of the dump (`g_su2_nrho`, `g_lambda`).
-- **Weights:** particle weights are recomputed for new cells. Particles already in a split
-  cell keep their weight until they move, which settles within a few steps.
+- **Weights (known problem):** with `global weight cell radius`, a cell's particle weight is
+  its centre radius × its axial width. SPARTA recomputes the weight of a new cell but leaves its
+  particles in place, so merging four cells into one doubles the number of molecules each of
+  their particles stands for. In the N₂ run, the 319,000 merged cells raised the mass flow
+  downstream by about 40% and the axis density at 40–60 mm to 1.7–1.8× SU2. The excess flows out
+  over a box transit or more. The fix is `global weight cell radius/only` (weight from the radius
+  alone), which needs `fnum` rescaled in `setup.py`; not done yet.
 - **Continuations:** `in.continue` doesn't repeat the hold or the adaptation. Continue from a
   restart written after it (the one at the end of the hold, or later).
 - **Set `adapt = false`** to keep the hold without adapting.
@@ -108,25 +105,48 @@ Check in `log.sparta` after the hold:
 - the `adapt_grid` summary (cells refined and coarsened, and the new cell count);
 - that the particle count had levelled off before the hold ended.
 
+### Images of the hold
+
+With `image_every` set, `in.sparta` writes a picture of the transient every `image_every`
+steps of the hold, so you can watch the jet fill the box:
+- **What it shows:** log10 of the number density in each grid cell, averaged over the
+  `image_avg_steps` (default 100) steps before each image. White is `image_log_range[0]`
+  or less, navy is `image_log_range[1]` or more. By default the range is the five decades
+  below the highest SU2 density in the domain (1e18 to 1e23 /m³ for the N₂ nozzle).
+- **Files:** `image.<step>.ppm`, `image_width` (default 1600) pixels wide, with the height
+  following the domain's aspect ratio. PPM because this SPARTA build has no JPEG/PNG
+  library. Each is about 4 MB.
+- **Sizing:** in 2D the SPARTA box is 1 m deep in z, and `dump image` scales the picture to
+  that, so without a zoom the domain fills a few percent of the frame. Setup computes the
+  `zoom` that makes the domain fill it.
+- **Only during the hold:** the images stop before the grid adaptation (new cells would be
+  blank until the next average) and are not part of the averaged run or `in.continue`.
+
+Convert or make a movie in the run directory:
+
+```bash
+magick mogrify -format png image.*.ppm && rm image.*.ppm        # PNGs, about 10x smaller
+ffmpeg -framerate 10 -pattern_type glob -i 'image.*.png' -pix_fmt yuv420p hold.mp4
+```
+
 ### Continuing a run
 
 `in.sparta` writes a restart file `restart.<step>.sparta` every `restart_every` steps and
 at the end. `in.continue` picks up from the latest one and runs up to an absolute timestep:
 
 ```bash
-python sparta/run.py runs/<name>/sparta --restart --target 30000   # memory-guarded, picks a new seed
-mpirun -n N spa_mpi -in in.continue -var target 30000              # by hand
-mpirun -n N spa_mpi -in in.continue -var target 50000 -var seed 777  # by hand, new seed
+CASE=my_case.toml STAGES=sparta_restart TARGET=50000 bash run_case.sh   # new seed from the step
+mpirun -n N spa_mpi -in in.continue -var target 50000 -var seed 777     # by hand
 ```
 
-Without `--target`, `run.py --restart` runs `run_steps` past the latest restart.
+Without `TARGET`, the `sparta_restart` stage runs `run_steps` past the newest restart. Its log
+goes to `log.<from>-<to>.sparta`, so `log.sparta` from the first run is kept.
 
 **Continuing after SU2 has changed:** `in.continue` reads `inflow.sparta` fresh, so you can
-update the inflow and continue the DSMC rather than starting from an empty box. Restart or
-rerun SU2, run `sparta/setup.py` to rewrite `inflow.sparta`, then `run.py --restart`
-(from Python: `su2_run(d, restart=True, iterations=...)`, `sparta_setup(case)`, then
-`sparta_run(s, restart=True, target=...)`). The DSMC keeps the grid from
-its restart file. A new grid only takes effect in a fresh run (`--sparta new`).
+update the inflow and continue the DSMC rather than starting from an empty box: run the
+stages `su2_restart handoff sparta_setup sparta_restart`. The DSMC keeps the grid from its
+restart file; a new grid only takes effect in a fresh `sparta` run. (`sparta_setup`
+rewrites `in.sparta` and `grid.sparta` but not the restart files.)
 
 - **What carries over:** the restart file holds the grid, particles, species, mixture, global
   settings (fnum, weight, gridcut), timestep size and step number.
@@ -153,7 +173,7 @@ for large chambers it is tens of thousands.
 |---|---|
 | `grid.sparta` | grid file for `read_grid`, with two extra columns: SU2 mean free path `lambda` and number density `su2_nrho` |
 | `in.grid` | a small SPARTA input that loads the domain and grid and dumps them; there is no flow |
-| `inflow.sparta` | the SU2 state on the coupling plane, as a `fix emit/face/file` table |
+| `inflow.sparta` | copy of the handoff's SU2 state on the coupling plane, a `fix emit/face/file` table |
 | `in.sparta` | the coupled DSMC run: grid, gas, inflow, averaging, dumps and restart files |
 | `in.continue` | continues from the latest `restart.<step>.sparta` up to `-var target <step>` |
 | `<gas>.species`, `<gas>.vss` | copied from `sparta/data/` |
@@ -247,10 +267,13 @@ Setup reports both mass flows. In the N₂ nozzle case, the 0.1 Pa background ov
 
 ### Where to put the coupling plane
 
-Setup computes the gradient-length Knudsen number Kn_GLL = λ|dρ/dx|/ρ on the SU2 axis
-nodes, and warns if the coupling plane is downstream of the point where it first goes above
-`kn_breakdown` (default 0.05). Past that point the NS solution can't be trusted as an inflow.
-For the 0.4 mm He capillary at 1 bar, breakdown is at about 4.7 D, so `x_couple_D = 4`.
+The handoff computes the gradient-length Knudsen number, either Kn_GLL = λ|dρ/dx|/ρ on the
+SU2 axis (`breakdown_gll`) or Boyd's full 2D form over each plane (`breakdown_2d`). With
+`x_couple_D = "auto"` it puts the plane `couple_margin_D` diameters upstream of where it first
+goes above `kn_breakdown` (default 0.01); with a number it uses that and warns if the plane
+is past breakdown. Its `report.txt` always checks the plane with the 2D form. Past that point the NS solution can't be trusted as an
+inflow. For the 0.4 mm He capillary at 1 bar, breakdown is at about 4.7 D, so `x_couple_D = 4`.
+See [handoff/README.md](../handoff/README.md).
 
 To look at the profile without building a grid:
 
@@ -258,20 +281,20 @@ To look at the profile without building a grid:
 python handoff/breakdown_gll.py my_case.toml       # or --su2 path/to/flow.vtu
 ```
 
-> **The check only looks at the axis.** In a nozzle plume, continuum breakdown starts off
-> the axis:
+> **The default criterion only looks at the axis.** In a nozzle plume, continuum breakdown
+> starts off the axis (`breakdown_2d` and the handoff report cover this):
 > - in the expansion around the lip;
 > - in the outer boundary layer, where λ approaches the layer thickness;
 > - in the near-vacuum background, where λ is centimetres at 0.1 Pa.
 >
 > In the N₂ nozzle (13 mm exit), the axis stays continuum well past 100 mm, but every plane
-> downstream of the exit has broken-down regions at larger r. A 2D criterion (a new
-> `handoff/` version) is the next step.
+> downstream of the exit has broken-down regions at larger r: with the 2D criterion, 20–40%
+> of the mass flow through every plane is over the threshold, from the exit plane on.
 
 > Downstream of breakdown the SU2 field is outside NS validity, and the SU2 jet collapses to
 > background density within a few more diameters. A real free jet stays far denser there.
-> Away from the coupling plane, the grid from setup is only a first guess. In the production
-> run, let SPARTA refine it (`fix adapt` / `adapt_grid`) to the actual DSMC density.
+> Away from the coupling plane, the grid from setup is only a first guess; the hold and
+> adaptation in `in.sparta` adjust it to the DSMC density.
 
 ---
 
@@ -279,7 +302,6 @@ python handoff/breakdown_gll.py my_case.toml       # or --su2 path/to/flow.vtu
 
 ```toml
 [sparta]
-x_couple_D = 4                 # coupling plane / DSMC xlo, in throat diameters past the exit
 base_grid = [200, 100]         # level-1 cells (x, r)
 cells_per_mfp = 3              # refine until cell size <= lambda / this; optional
 ppc_target = 20                # particles per refined cell, used for fnum; optional
@@ -287,8 +309,6 @@ fnum = "auto"                  # or a number; optional
 timestep_s = "auto"            # or a number; optional
 # dt_tau_frac = 0.2            # timestep <= this x mean collision time; optional
 # dt_cell_frac = 0.5           # timestep <= this x cell transit time; optional
-# kn_breakdown = 0.05          # Kn_GLL threshold for the coupling-plane check; optional
-# breakdown_module = "handoff.breakdown_gll"  # which breakdown version to use; optional
 # max_levels = 5               # optional cap below the cell-ID bit limit
 # max_particles = 5e6          # cap on steady-state particles for the automatic fnum (~200 B each); optional
 # run_steps = 1000             # steps in in.sparta; optional
@@ -301,9 +321,16 @@ timestep_s = "auto"            # or a number; optional
 #                              # default run_steps, or gcd(hold_steps, run_steps) with a hold
 # average_steps = 500          # average over the last this many steps before each dump; optional, default output_every/2
 # restart_every = 5000         # write restart.<step>.sparta every this many steps; optional, default run_steps
-# max_mem_gb = 6               # sparta/run.py memory limit; optional, default half the RAM
-nprocs = 20                    # MPI ranks for sparta/run.py
+# image_every = 500            # image.<step>.ppm of log10 density every this many hold steps; optional, default 0 (off)
+# image_avg_steps = 100        # average the density over this many steps before each image; optional
+# image_width = 1600           # pixels; the height follows the domain's aspect ratio; optional
+# image_log_range = [18, 23]   # log10 n [1/m3] for white and navy; optional, default 5 decades below the SU2 maximum
 ```
+
+The coupling-plane keys (`x_couple_D`, `couple_margin_D`, `kn_breakdown`, `breakdown_module`)
+are in the same `[sparta]` section but are read by the handoff; see
+[handoff/README.md](../handoff/README.md#case-file). MPI ranks come from `run_case.sh`
+(`NP`), not the case file.
 
 The `[case]`, `[geometry]` and `[gas]` sections are described in the
 [main README](../README.md#case-file).
@@ -312,9 +339,8 @@ The `[case]`, `[geometry]` and `[gas]` sections are described in the
 
 | File | Contents |
 |---|---|
-| `setup.py` | command-line entry point: domain, grid, fnum/dt, inflow, Kn check, writes the run directory |
-| `run.py` | runs SPARTA under mpirun with the memory guards; output tee'd to `sparta.log` |
-| `inflow.py` | samples SU2 on the coupling plane, writes the `fix emit/face/file` table, Maxwellian fluxes |
+| `setup.py` | command-line entry point: domain, grid, fnum/dt, input files; reads the handoff |
+| `inflow.py` | samples SU2 on the coupling plane, writes the `fix emit/face/file` table, Maxwellian fluxes (used by the handoff) |
 | `grid.py` | refinement (`build`), SPARTA cell IDs, `read_grid` file writer |
 | `gas.py` | reads `.species`/`.vss` files; VSS mean free path, viscosity and mean thermal speed |
 | `data/` | `he`, `ar`, `d2` and `n2` species and VSS files |
@@ -327,6 +353,5 @@ The `[case]`, `[geometry]` and `[gas]` sections are described in the
   matching IDs. Add the SU2 entry too; see [su2/README.md](../su2/README.md#extending).
   In the `.species` file, `RotRel` and `VibRel` are relaxation *probabilities* per
   collision (1/Z, so Z_rot = 5 is `0.2`), not collision numbers.
-- **Grid adaptation (next step):** let SPARTA refine the grid to its own density
-  (`adapt_grid` / `fix adapt`). Away from the coupling plane, the grid from setup is only a
-  first guess.
+- **Weighting under adaptation (next step):** switch to `global weight cell radius/only`
+  so merged cells keep the right density (see Transient hold and grid adaptation).

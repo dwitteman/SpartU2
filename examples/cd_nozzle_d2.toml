@@ -37,13 +37,12 @@ n_axial_div = 200             # throat -> exit, split in two blocks clustered at
 n_axial_ext = 300             # exit plane -> outlet
 n_radial_ext = 200            # lip -> chamber radius
 iterations = 15000
-nprocs = 20
 
 [sparta]
-x_couple_D = 10               # in throat diameters (here 5 mm = 2.5 exit diameters)
+x_couple_D = 10               # forced, in throat diameters (5 mm); "auto" = couple_margin_D upstream of axis Kn_GLL breakdown
+# couple_margin_D = 1          # with "auto": how far upstream of breakdown, in throat diameters
 base_grid = [200, 100]
 cells_per_mfp = 3
 ppc_target = 20
 fnum = "auto"
 timestep_s = "auto"
-nprocs = 20

@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """Build a SPARTA run directory: DSMC domain and a grid sized from the SU2 solution.
 
-Usage: python sparta/setup.py [CASE.toml] [--runs RUNS_DIR] [--su2 FLOW.vtu]
-Needs a finished SU2 run (RUNS_DIR/<name>/su2/flow.vtu by default) and writes
+Usage: python sparta/setup.py CASE.toml [--runs RUNS_DIR]
+Needs the handoff (RUNS_DIR/<name>/handoff/, from handoff/handoff.py) and writes
 RUNS_DIR/<name>/sparta/.
 
-The DSMC domain starts at the coupling plane x = x_couple_D * D, downstream of
-the nozzle exit, and fills the rest of the chamber. Its grid is refined so
-that every cell is smaller than the local mean free path / cells_per_mfp.
-The SU2 state on the plane becomes the DSMC inflow (inflow.sparta, see
-sparta/inflow.py); in.sparta runs the coupled DSMC case, in.grid only loads the grid.
+The DSMC domain starts at the coupling plane chosen by the handoff and fills the
+rest of the chamber. Its grid is refined so that every cell is smaller than the
+local mean free path / cells_per_mfp, using the SU2 solution the handoff read.
+The handoff's inflow.sparta is copied in; in.sparta runs the coupled DSMC case,
+in.continue continues it from a restart file, in.grid only loads the grid.
 """
 import argparse
-import importlib
 import math
 import shutil
 import sys
@@ -23,29 +22,11 @@ import numpy as np
 if __package__ in (None, ""):  # allow `python sparta/setup.py` as well as `-m sparta.setup`
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from handoff.handoff import read_handoff
 from lib.common import die, get, load_case, log
 from lib.su2_field import Su2Field
 from sparta import grid as sgrid
-from sparta import inflow
 from sparta.gas import DATA, load_gas
-
-
-# Breakdown-parameter implementation, chosen by [sparta] breakdown_module. Any module
-# with these names works, so different versions can sit side by side in handoff/.
-DEFAULT_BREAKDOWN = "handoff.breakdown_gll"
-BREAKDOWN_API = ("KN_BREAKDOWN", "axis_knudsen", "kn_at", "first_breakdown")
-
-
-def load_breakdown(name: str):
-    """Import a breakdown module by dotted name and check it has the expected functions."""
-    try:
-        mod = importlib.import_module(name)
-    except ModuleNotFoundError as e:
-        die(f"breakdown_module '{name}' not found ({e})")
-    missing = [a for a in BREAKDOWN_API if not hasattr(mod, a)]
-    if missing:
-        die(f"breakdown_module '{name}' is missing: {', '.join(missing)}")
-    return mod
 
 
 def _auto(case, key, default="auto"):
@@ -54,7 +35,7 @@ def _auto(case, key, default="auto"):
     return None if v == "auto" else float(v)
 
 
-def setup(case_path, runs_dir="runs", su2_vtu=None) -> Path:
+def setup(case_path, runs_dir="runs") -> Path:
     case_path = Path(case_path).resolve()
     case = load_case(case_path)
     name = get(case, "case", "name")
@@ -64,18 +45,20 @@ def setup(case_path, runs_dir="runs", su2_vtu=None) -> Path:
     D = get(case, "geometry", "throat_diam_mm") * 1e-3
     Lx = get(case, "geometry", "chamb_length_cm") * 1e-2
     Rext = get(case, "geometry", "chamb_height_cm") * 1e-2
-    x_c = get(case, "sparta", "x_couple_D") * D
+    ho = read_handoff(Path(runs_dir) / name)
+    x_c = ho["x_couple_m"]
     nx, ny = get(case, "sparta", "base_grid")[:2]
     k = get(case, "sparta", "cells_per_mfp", 3)
     ppc_target = get(case, "sparta", "ppc_target", 20)
     tau_frac = get(case, "sparta", "dt_tau_frac", 0.2)
     cell_frac = get(case, "sparta", "dt_cell_frac", 0.5)
     if not 0 <= x_c < Lx:
-        die(f"x_couple_D puts the coupling plane at {x_c*1e3:.3g} mm, outside the chamber")
+        die(f"handoff coupling plane x = {x_c*1e3:.3g} mm is outside the chamber: rerun handoff/handoff.py")
 
-    vtu = Path(su2_vtu) if su2_vtu else Path(runs_dir) / name / "su2" / "flow.vtu"
-    if not vtu.is_file():
-        die(f"{vtu} not found: run SU2 first (su2/setup.py, su2/run.py) or pass --su2")
+    vtu = Path(ho["su2_vtu"])
+    inflow_file = Path(runs_dir) / name / "handoff" / "inflow.sparta"
+    if not vtu.is_file() or not inflow_file.is_file():
+        die(f"{vtu} or {inflow_file} is missing: rerun handoff/handoff.py")
 
     gas = load_gas(get(case, "gas", "species_file"))
     log(f"reading SU2 solution {vtu}")
@@ -118,18 +101,10 @@ def setup(case_path, runs_dir="runs", su2_vtu=None) -> Path:
     dt = _auto(case, "timestep_s") or dt_rec
     ppc = ndy / fnum
 
-    # ---- continuum breakdown along the axis ---------------------------------
-    breakdown = load_breakdown(get(case, "sparta", "breakdown_module", DEFAULT_BREAKDOWN))
-    kn_thr = get(case, "sparta", "kn_breakdown", breakdown.KN_BREAKDOWN)
-    xa, kn = breakdown.axis_knudsen(field, gas)
-    kn_c = breakdown.kn_at(xa, kn, x_c)
-    x_break = breakdown.first_breakdown(xa, kn, kn_thr)
-
-    # ---- inflow at the coupling plane ---------------------------------------
-    plane = inflow.sample_plane(field, gas, x_c, inflow.plane_radii(field, x_c, Rext))
-    flows = inflow.plane_summary(plane, gas.mass)
+    # ---- run length and output ---------------------------------------------
     run_steps = int(get(case, "sparta", "run_steps", 1000))
     hold = adapt_hold(case)
+    hold["images"] = hold_images(case, box, hold["steps"], float(d["n"].max()))
     # dumps fall on multiples of output_every counted from step 0, so with a hold it must
     # divide both the hold and the run for every averaged block (and the last) to be written
     out_every = int(get(case, "sparta", "output_every",
@@ -155,9 +130,7 @@ def setup(case_path, runs_dir="runs", su2_vtu=None) -> Path:
         shutil.copy(DATA / f"{stem}.{ext}", run_dir / f"{stem}.{ext}")
     g.write(run_dir / "grid.sparta", {"lambda": d["lam"], "su2_nrho": d["n"]})
     (run_dir / "in.grid").write_text(in_grid(case_path.name, box, gas.species, stem, fnum, dt))
-    inflow.write_inflow(run_dir / "inflow.sparta", plane, rot=gas.rotdof > 0, vib=gas.vibdof > 0,
-                        header=f"Generated by sparta/setup.py from {case_path.name} ({vtu})\n"
-                               f"SU2 state on x = {x_c:.10g} m: nrho [1/m3], v [m/s], T [K]")
+    shutil.copy(inflow_file, run_dir / "inflow.sparta")
     io = dict(out_every=out_every, avg_steps=avg_steps, restart_every=restart_every)
     (run_dir / "in.sparta").write_text(in_run(case_path.name, box, gas.species, stem, fnum, dt,
                                               run_steps, hold=hold, **io))
@@ -180,21 +153,19 @@ def setup(case_path, runs_dir="runs", su2_vtu=None) -> Path:
         f"10th pct {np.percentile(ppc[ref], 10):.3g}; all cells min {ppc.min():.3g}",
         f"  steady-state particles ~ {ppc.sum():.3g} (~{ppc.sum() * 200 / 1e9:.2g} GB at 200 B each)",
         f"timestep {dt:.3g} s" + ("" if dt == dt_rec else f"  (recommended {dt_rec:.3g})"),
-        f"inflow: {len(plane['r'])} points on the plane; SU2 net mass flow {flows['mdot_net']:.4g} kg/s, "
-        f"emitted (one-sided) {flows['mdot_inward']:.4g} kg/s",
-        f"  plane: n {plane['n'].min():.3g} to {plane['n'].max():.3g} /m3, "
-        f"T {plane['T'].min():.3g} to {plane['T'].max():.3g} K, u {plane['u'].min():.3g} to {plane['u'].max():.3g} m/s",
+        f"inflow (from the handoff, {ho['mode']} plane): SU2 net mass flow {ho['mdot_net']:.4g} kg/s, "
+        f"emitted (one-sided) {ho['mdot_inward']:.4g} kg/s; axis Kn_GLL at the plane {ho['kn_at_plane']:.3g}",
         (f"hold: {hold['steps']} steps ({hold['steps'] * dt:.3g} s) without output, then "
          + (f"adapt the grid to the particle count averaged over the last {hold['window']} steps "
             f"(refine > {hold['refine']:g}, coarsen < {hold['coarsen']:g} particles)"
             if hold["adapt"] else "no grid adaptation")
          if hold["steps"] else "hold: none"),
+        (f"images: image.<step>.ppm every {hold['images']['every']} steps of the hold, "
+         f"{hold['images']['width']} x {hold['images']['height']} px, log10 n from "
+         f"{hold['images']['lo']:g} to {hold['images']['hi']:g}" if hold["images"] else "images: none"),
         f"run: {run_steps} steps ({run_steps * dt:.3g} s); output every {out_every} (averaged over the "
         f"last {avg_steps}); restart file every {restart_every}; "
-        f"one transit of the box at the max inflow speed takes {(Lx - x_c) / max(plane['u'].max(), 1.0) / dt:.3g} steps",
-        f"axis Kn_GLL at coupling plane: {kn_c:.3g} "
-        + (f"(continuum breaks down at x ~ {x_break/D:.3g} D)" if x_break is not None
-           else "(below breakdown everywhere on the axis)"),
+        f"one transit of the box at the max inflow speed takes {(Lx - x_c) / max(ho['u_max'], 1.0) / dt:.3g} steps",
     ]
     for line in rep:
         log(line)
@@ -203,10 +174,10 @@ def setup(case_path, runs_dir="runs", su2_vtu=None) -> Path:
         warn.append(f"{g.unresolved} cells still exceed lambda/{k} at the level limit "
                     f"(worst by {g.worst:.2g}x): coarsen base_grid, or move the coupling "
                     f"plane downstream")
-    if x_break is not None and x_c >= x_break:
-        warn.append(f"axis Kn_GLL first exceeds {kn_thr} at {x_break/D:.3g} D, upstream of "
-                    f"the coupling plane: SU2 is not reliable there, use x_couple_D < "
-                    f"{x_break/D:.3g}")
+    if "x_breakdown_m" in ho and x_c >= ho["x_breakdown_m"]:
+        warn.append(f"axis Kn_GLL first exceeds {ho['kn_threshold']} at {ho['x_breakdown_m']/D:.3g} D, "
+                    f"upstream of the coupling plane: SU2 is not reliable there, use "
+                    f"x_couple_D < {ho['x_breakdown_m']/D:.3g} or \"auto\"")
     if ppc.sum() > 1.01 * max_particles:
         warn.append(f"fnum = {fnum:.3g} gives ~{ppc.sum():.3g} particles, over max_particles = "
                     f"{max_particles:.3g}: this may not fit in memory")
@@ -274,6 +245,59 @@ def adapt_hold(case) -> dict:
     return h
 
 
+def hold_images(case, box, hold_steps, n_max):
+    """[sparta] image_* settings for snapshots of the transient hold, or None.
+
+    Picture size: in 2D the SPARTA box is 1 m deep in z, and dump image scales the picture to
+    2 x the largest box dimension, so without a zoom the domain fills a few % of the frame.
+    zoom = 2 max(Lx, Ly, 1 m) / (height of the picture in metres) makes the box fill it."""
+    every = int(get(case, "sparta", "image_every", 0))
+    if not every:
+        return None
+    if every < 0 or not hold_steps:
+        die("sparta.image_every needs a positive value and a transient hold (hold_steps > 0)")
+    xlo, xhi, ylo, yhi = box
+    Lx, Ly = xhi - xlo, yhi - ylo
+    width = int(get(case, "sparta", "image_width", 1600))
+    height = 2 * round(width * Ly / Lx / 2)  # even, for movie encoders
+    zoom = 0.99 * 2 * max(Lx, Ly, 1.0) / max(Ly, Lx * height / width)
+    avg = int(get(case, "sparta", "image_avg_steps", min(100, every)))
+    if not 0 < avg <= every:
+        die("sparta.image_avg_steps must be between 1 and image_every")
+    hi_auto = math.ceil(math.log10(max(n_max, 1.0)))
+    lo, hi = (float(v) for v in get(case, "sparta", "image_log_range", [hi_auto - 5, hi_auto]))
+    if not lo < hi:
+        die("sparta.image_log_range must be [low, high] with low < high (log10 of 1/m3)")
+    return dict(every=every, avg=avg, width=width, height=height, zoom=zoom, lo=lo, hi=hi)
+
+
+def _images_on(img) -> str:
+    """Start the hold snapshots: log10 number density per cell, averaged, as PPM images."""
+    return f"""# ---- images of the transient hold -------------------------------------------------------
+# image.<step>.ppm every {img['every']} steps: log10 number density per cell, averaged over the
+# {img['avg']} steps before each image, white = 1e{img['lo']:g} /m3 or less, navy = 1e{img['hi']:g} /m3 or more.
+# PPM because this SPARTA build has no JPEG/PNG; convert with ImageMagick (sparta/README.md).
+# zoom: the 2D box is 1 m deep in z and the picture is scaled to that, so zoom fits it to the domain.
+compute         img grid all gas nrho
+variable        img_lgn grid log(c_img[1]+{10 ** img['lo']:.4g})
+fix             img ave/grid all 1 {img['avg']} {img['every']} v_img_lgn
+dump            img image all {img['every']} image.*.ppm type type particle no grid f_img &
+                size {img['width']} {img['height']} zoom {img['zoom']:.6g} box no 0.0
+dump_modify     img pad 7 backcolor white &
+                cmap grid {img['lo']:g} {img['hi']:g} cf 0.0 5 min white 0.25 lightsteelblue 0.5 cornflowerblue 0.75 royalblue max navy
+
+"""
+
+
+_IMAGES_OFF = """# end of the hold: stop the images (before the grid changes)
+undump          img
+unfix           img
+variable        img_lgn delete
+uncompute       img
+
+"""
+
+
 def _averaging(out_every, avg_steps) -> str:
     """Time-averaged flow field and its dump."""
     return f"""\
@@ -305,11 +329,13 @@ def _hold_block(hold) -> str:
     """Transient hold, then optional one-time grid adaptation to where the particles are."""
     if not hold["steps"]:
         return ""
+    img = hold.get("images")
+    on, off = (_images_on(img), _IMAGES_OFF) if img else ("", "")
     txt = f"""\
-# ---- transient hold: let the jet fill the box before averaging -------------------------
+{on}# ---- transient hold: let the jet fill the box before averaging -------------------------
 """
     if not hold["adapt"]:
-        return txt + f"run             {hold['steps']}\n\n"
+        return txt + f"run             {hold['steps']}\n\n{off}"
     return txt + f"""\
 run             {hold['steps'] - hold['window']}
 
@@ -318,7 +344,7 @@ compute         hold_n grid all gas n
 fix             hold_n ave/grid all 1 {hold['window']} {hold['window']} c_hold_n[1]
 run             {hold['window']}
 
-# ---- adapt the grid to the particles ----------------------------------------------------
+{off}# ---- adapt the grid to the particles ----------------------------------------------------
 # refine cells holding > {hold['refine']:g} particles, merge sibling cells holding < {hold['coarsen']:g} in total.
 # Refinement stops at the cell-ID bit limit (cells already at the finest level stay);
 # new cells get 0 in the SU2 columns g_su2_nrho, g_lambda.
@@ -402,11 +428,10 @@ write_restart   restart.*.sparta
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("case", nargs="?", default="config.toml", help="case file (default: config.toml)")
+    ap.add_argument("case", help="case file")
     ap.add_argument("--runs", default="runs", help="runs directory (default: ./runs)")
-    ap.add_argument("--su2", help="SU2 flow.vtu (default: RUNS/<name>/su2/flow.vtu)")
     args = ap.parse_args(argv)
-    setup(args.case, args.runs, args.su2)
+    setup(args.case, args.runs)
 
 
 if __name__ == "__main__":

@@ -61,6 +61,7 @@ class Su2Field:
                                 a["Velocity"][keep, 0], a["Velocity"][keep, 1]]).astype(float)
         self.nodes = dict(zip(("rho", "T", "u", "v"), vals.T))
         self._lin = LinearNDInterpolator(self.xy, vals)  # Delaunay of the SU2 nodes
+        self.tri = self._lin.tri  # scipy Delaunay triangulation, reusable for other node fields
         self._near = NearestNDInterpolator(self.xy, vals)  # fallback just outside the hull
 
     def sample(self, x, y) -> dict:

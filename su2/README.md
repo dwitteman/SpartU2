@@ -1,8 +1,8 @@
 # SU2 stage
 
 Solves laminar Navier–Stokes for the capillary flow and the near-field jet. The result
-(`flow.vtu`) is used by the [SPARTA stage](../sparta/README.md) to size the DSMC grid, and
-later to provide its inflow.
+(`flow.vtu`) is used by the [handoff](../handoff/README.md) to place the coupling plane and
+write the DSMC inflow, and by the [SPARTA stage](../sparta/README.md) to size the DSMC grid.
 
 Run all commands from the repo root. For the overall workflow, see the
 [main README](../README.md).
@@ -29,32 +29,36 @@ This does four things:
 To continue an unconverged run from its `restart_flow.dat`:
 
 ```bash
-python su2/run.py runs/<name>/su2 --restart --iter 20000   # 20000 more iterations
+CASE=my_case.toml STAGES=su2_restart SU2_ITER=20000 bash run_case.sh   # 20000 more iterations
 ```
 
-- **What `run.py` changes:** it sets `RESTART_SOL` and `ITER` in `su2.cfg` itself. Without
-  `--restart` it sets `RESTART_SOL= NO`, so a plain run always starts from the initial
-  state, whatever an earlier restart left in `su2.cfg`.
+- **What the stage changes:** `run_case.sh` sets `RESTART_SOL` (and `ITER`, if `SU2_ITER` is
+  given) in `su2.cfg` with `sed`. The plain `su2` stage sets `RESTART_SOL= NO`, so it always
+  starts from the initial state, whatever an earlier restart left in `su2.cfg`.
 - **Archive:** before a restart, the current `flow.vtu`, `history.csv`, `su2.log`,
   `restart_flow.dat` and `su2.cfg` are copied to `archive/<n>/`. You can compare the new
   solution with the old one, or go back.
-- **Iteration count:** SU2 counts iterations from 0 again after a restart, so `--iter` is the
+- **Iteration count:** SU2 counts iterations from 0 again after a restart, so `SU2_ITER` is the
   number for this run, not a total.
 - **Don't run setup between restarts:** it remeshes, so the restart file no longer fits.
-
-From Python (for example in `runnit.py`): `su2_run(run_dir, restart=True, iterations=20000)`;
-see the [main README](../README.md#from-python).
+- **Stepping the back pressure down:** `BACK_PRES=<Pa>` sets the outlet pressure
+  (`MARKER_OUTLET`, and `FREESTREAM_PRESSURE`, which only sets the initial state) in `su2.cfg`
+  for the `su2` and `su2_restart` stages. Start with `su2` at a high back pressure, then
+  `su2_restart` at lower ones, each from the previous solution. `[su2] back_pres_pa` in the
+  case file only applies at `su2_setup`; set it to the final value so the case file records it.
 
 ## Run
 
 ```bash
-python su2/run.py runs/<name>/su2           # MPI ranks default to [su2] nprocs
-python su2/run.py runs/<name>/su2 -n 8
-python su2/run.py runs/<name>/su2 --restart --iter 20000   # continue; see Restarting
+CASE=my_case.toml STAGES=su2 NP=8 bash run_case.sh   # or qsub -v CASE=...,STAGES=su2 run_case.sh
+cd runs/<name>/su2 && mpirun -np 8 SU2_CFD su2.cfg > su2.log 2>&1   # the same, by hand
 ```
 
-SU2's output appears on screen and is also saved to `su2.log`. Ctrl-C stops the MPI job.
-The script exits with SU2's exit code.
+SU2's screen output goes to `su2.log`; it is block-buffered, so follow progress in
+`history.csv`. SU2 writes `flow.vtu` and `restart_flow.dat` every 500 iterations. A job
+killed while writing (walltime, `qdel`) can leave `flow.vtu` truncated; the handoff then
+stops with a message. Rewrite it from `restart_flow.dat` with `SU2_ITER=1` and the
+`su2_restart` stage (this overwrites `history.csv`; the earlier one is in `archive/<n>/`).
 
 ## Results
 
@@ -88,8 +92,18 @@ compared directly.
 
 ### Checking convergence
 
-- **Residual:** `rms[Rho]` should fall. The run stops early once it reaches 1e-10. A residual
-  that has levelled off means the run is stuck, not converged.
+- **Automatic stop:** the run stops when the total mass flow on the inlet and outlet
+  (`SURFACE_MASSFLOW`, the `Avg_Massflow` column in `history.csv`) stops changing. SU2 averages
+  its change per iteration over 1000 iterations (a Cauchy test, `CONV_CAUCHY_ELEMS`), and setup
+  sets the tolerance `CONV_CAUCHY_EPS` from the ideal choked mass flow, so the test is relative:
+  converged when the mass flow changes by less than `conv_massflow_rel` (default 1e-6) of itself
+  per iteration, about 1% per 10,000 iterations. That works the same for a 1e-9 kg/s capillary
+  and a 1e-4 kg/s nozzle. Two details:
+  - **Field name:** it must be `CONV_FIELD= SURFACE_MASSFLOW`. SU2 ignores the CSV header name
+    `Avg_Massflow` (it prints "Ignoring Convergence Field(s)") and then runs every iteration.
+  - **Counting from 0:** the test needs at least 1000 iterations after each start or restart.
+- **Residual:** `rms[Rho]` should fall. A residual that has levelled off means the run is
+  stuck, not converged.
 - **Mass balance:** at steady state, what comes in must go out. The outlet column should be
   about −(inlet), and the total should go to about 0. If the total is still close to the
   inlet value, gas is still building up inside the domain.
@@ -225,7 +239,7 @@ n_axial_tube = 800             # cells along the tube
 n_axial_ext = 300              # cells from the exit plane to the outlet
 n_radial_ext = 200             # cells from the lip to the outer radius
 iterations = 15000             # maximum iterations
-nprocs = 20                    # default number of MPI ranks for run.py; optional, default 1
+# conv_massflow_rel = 1e-6     # stop when the mass flow changes by less than this fraction per iteration; optional
 # ext_length_D, ext_radius_D   # currently unused: [geometry] chamb_* set the domain size
 ```
 

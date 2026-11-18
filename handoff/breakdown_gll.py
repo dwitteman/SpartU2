@@ -24,7 +24,7 @@ import numpy as np
 if __package__ in (None, ""):  # allow `python handoff/breakdown_gll.py` as well as `-m`
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-KN_BREAKDOWN = 0.05  # default threshold (Boyd, Chen & Chandler 1995)
+KN_BREAKDOWN = 0.01  # default threshold (H.Bi et al)  (.05 for Boyd, Chen & Chandler 1995)
 
 
 def kn_gll(x, rho, T, gas):
@@ -66,6 +66,11 @@ def axis_knudsen(field, gas):
     """(x, Kn_GLL) on the axis of an SU2 solution."""
     x, rho, T = axis_profile(field)
     return x, kn_gll(x, rho, T, gas)
+
+
+def knudsen_profile(field, gas):
+    """(x, kn) used by the handoff to place the coupling plane: here, Kn_GLL on the axis."""
+    return axis_knudsen(field, gas)
 
 
 def main(argv=None):

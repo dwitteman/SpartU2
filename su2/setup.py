@@ -5,6 +5,7 @@ Usage: python su2/setup.py [CASE.toml] [--runs RUNS_DIR]
 Creates RUNS_DIR/<case name>/su2/ (CASE defaults to config.toml, RUNS_DIR to ./runs).
 """
 import argparse
+import math
 import importlib
 import re
 import shutil
@@ -61,6 +62,29 @@ def write_mesh(case: dict, case_path: Path, run_dir: Path):
     with open(run_dir / "mesh.su2") as f:
         nelem = next((m.group(1) for line in f if (m := re.match(r"NELEM=\s*(\d+)", line))), "?")
     log(f"mesh: {nelem} cells")
+
+
+def ideal_massflow(case: dict) -> float:
+    """Isentropic choked mass flow [kg/s] through the throat (diameter throat_diam_mm) from the
+    plenum state: p0 A* sqrt(gamma / (R T0)) (2 / (gamma + 1))^((gamma + 1) / (2 (gamma - 1)))."""
+    g = GASES[Path(get(case, "gas", "species_file")).stem]
+    gam, R = g["gamma"], g["R"]
+    area = math.pi * (get(case, "geometry", "throat_diam_mm") * 1e-3 / 2) ** 2
+    p0, T0 = get(case, "gas", "plen_pres_pa"), get(case, "gas", "plen_temp_K")
+    return p0 * area * math.sqrt(gam / (R * T0)) * (2 / (gam + 1)) ** ((gam + 1) / (2 * (gam - 1)))
+
+
+def massflow_cauchy_eps(case: dict) -> float:
+    """CONV_CAUCHY_EPS for CONV_FIELD= SURFACE_MASSFLOW, from [su2] conv_massflow_rel.
+
+    SU2 averages |change of the field per iteration| / max(|field|, 0.1) over CONV_CAUCHY_ELEMS
+    iterations. Mass flows here are far below 0.1 kg/s, so that is an absolute change / 0.1;
+    scaling eps with the ideal mass flow makes the test relative: converged when the mass flow
+    changes by less than conv_massflow_rel of itself per iteration (default 1e-6, i.e. ~1% per
+    10,000 iterations), whatever the case's flow rate."""
+    rel = float(get(case, "su2", "conv_massflow_rel", 1e-6))
+    mdot = ideal_massflow(case)
+    return rel * mdot / max(mdot, 0.1)
 
 
 def su2_config(case: dict, case_name: str) -> str:
@@ -138,16 +162,17 @@ VENKAT_LIMITER_COEFF= 0.05
 TIME_DISCRE_FLOW= EULER_IMPLICIT
 CFL_NUMBER= 1.0
 CFL_ADAPT= YES
-CFL_ADAPT_PARAM= ( 0.5, 1.2, 0.5, 100.0 )
+CFL_ADAPT_PARAM= ( 0.5, 1.2, 0.5, 5000.0 )
 LINEAR_SOLVER= FGMRES
 LINEAR_SOLVER_PREC= ILU
 LINEAR_SOLVER_ERROR= 1E-4
-LINEAR_SOLVER_ITER= 20
+LINEAR_SOLVER_ITER= 50
 
 % ---- convergence ------------------------------------------------------------
 ITER= {iters}
+
 CONV_FIELD= RMS_DENSITY
-CONV_RESIDUAL_MINVAL= -10
+CONV_RESIDUAL_MINVAL= -12
 CONV_STARTITER= 100
 
 % ---- I/O --------------------------------------------------------------------

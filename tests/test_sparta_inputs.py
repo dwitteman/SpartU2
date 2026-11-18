@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from sparta.setup import adapt_hold, in_continue, in_run
+from sparta.setup import adapt_hold, hold_images, in_continue, in_run
 
 BOX = (0.005, 0.12, 0.0, 0.06)
 IO = dict(out_every=5000, avg_steps=2500, restart_every=10000)
@@ -61,3 +61,35 @@ def test_continue_reads_restart_and_does_not_adapt():
     assert c.index("read_restart restart.*.sparta balance rcb cell") < index_of(c, r"fix avg")
     assert not any("adapt_grid" in x for x in c)
     assert c[-2:] == ["run ${target} upto", "write_restart restart.*.sparta"]
+
+
+def test_hold_images_settings():
+    assert hold_images({"sparta": {}}, BOX, 25000, 5e22) is None
+    img = hold_images({"sparta": {"image_every": 500}}, BOX, 25000, 5e22)
+    Lx, Ly = BOX[1] - BOX[0], BOX[3] - BOX[2]
+    assert img["width"] == 1600 and img["height"] % 2 == 0
+    assert abs(img["height"] / img["width"] - Ly / Lx) < 2 / img["width"]
+    # picture height in metres = 2 max(Lx, Ly, 1 m) / zoom: just over the domain radius
+    assert Ly < 2 * 1.0 / img["zoom"] < 1.02 * Ly
+    assert (img["lo"], img["hi"], img["avg"]) == (18, 23, 100)
+    with pytest.raises(SystemExit, match="transient hold"):
+        hold_images({"sparta": {"image_every": 500}}, BOX, 0, 5e22)
+    with pytest.raises(SystemExit, match="image_avg_steps"):
+        hold_images({"sparta": {"image_every": 500, "image_avg_steps": 600}}, BOX, 25000, 5e22)
+
+
+def test_images_only_during_the_hold():
+    hold = adapt_hold({"sparta": {"hold_steps": 25000}})
+    hold["images"] = hold_images({"sparta": {"image_every": 500}}, BOX, 25000, 5e22)
+    text = in_run("case.toml", BOX, "N2", "n2", 1e17, 1e-8, 10000, hold=hold, **IO)
+    c = commands(text)
+    order = [r"fix img ave/grid all 1 100 500 v_img_lgn$", r"dump img image all 500 image\.\*\.ppm",
+             r"run 24000$", r"run 1000$", r"undump img$", r"unfix img$", r"uncompute img$",
+             r"adapt_grid", r"fix avg ave/grid"]
+    idx = [index_of(c, q) for q in order]
+    assert idx == sorted(idx)
+    assert "&\n" in text  # long dump line continued with &, which SPARTA joins
+    no_adapt = adapt_hold({"sparta": {"hold_steps": 20000, "adapt": False}})
+    no_adapt["images"] = hold["images"]
+    c = commands(in_run("case.toml", BOX, "N2", "n2", 1e17, 1e-8, 10000, hold=no_adapt, **IO))
+    assert index_of(c, r"run 20000$") < index_of(c, r"undump img$") < index_of(c, r"run 1$")

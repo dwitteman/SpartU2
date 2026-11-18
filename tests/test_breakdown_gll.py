@@ -85,8 +85,8 @@ def test_su2_capillary_breaks_down_between_4_and_6_D():
 
     D = 0.4e-3
     x, kn = breakdown_gll.axis_knudsen(Su2Field(VTU, xmin=-1e-9), load_gas("he.species"))
-    xb = breakdown_gll.first_breakdown(x, kn)
+    xb = breakdown_gll.first_breakdown(x, kn, 0.05)  # the published 0.05 criterion, whatever the default
     assert xb is not None and 4 * D < xb < 6 * D
-    assert breakdown_gll.kn_at(x, kn, 4 * D) < breakdown_gll.KN_BREAKDOWN
+    assert breakdown_gll.kn_at(x, kn, 4 * D) < 0.05
     near = (x > 0.5 * D) & (x < 4 * D)  # free-jet region: Kn grows downstream
     assert np.all(np.diff(kn[near]) > -0.1 * kn[near][1:])
