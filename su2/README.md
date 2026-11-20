@@ -16,7 +16,8 @@ python su2/setup.py my_case.toml --runs /scratch/runs
 
 This does five things:
 1. Creates `runs/<name>/su2/` and copies the case file into it as `case.toml`.
-2. Writes `mesh.geo` using the geometry generator `su2/geom/<noz_type>.py`.
+2. Writes `mesh.geo` with the mesher `su2/mesh.py`, from the shape that `su2/geom/<noz_type>.py`
+   describes ([Geometry and mesh](#geometry-and-mesh)).
 3. Runs gmsh to produce `mesh.su2`. gmsh's output goes to `gmsh.log`, and the cell count is printed.
 4. Writes `mesh_quality.txt` ([below](#mesh-quality)) and prints any checks it fails as warnings.
 5. Writes `su2.cfg`: boundary conditions, gas properties and solver settings.
@@ -168,6 +169,37 @@ To compare two snapshots, copy `flow.vtu` aside before a restart.
 
 ## Model
 
+### Geometry and mesh
+
+The mesh is made in two parts:
+- **A geometry provider**, `su2/geom/<noz_type>.py`, describes the nozzle only: its wall radius
+  r(x) from the inlet to the exit plane (x = 0), split into axial sections, each with a cell
+  count and the end its cells cluster toward.
+- **The mesher**, `su2/mesh.py`, turns any such shape into structured quad blocks:
+  - one nozzle block per section, `n_radial_tube` cells from the wall to the axis;
+  - the chamber blocks below and above the lip radius;
+  - the boundary markers (`inlet`, `wall`, `faceplate`, `axis`, `outlet`);
+  - the gmsh run and `mesh_quality.txt`.
+
+  The chamber options (`exit_cell_um`, `lip_relax_*`) therefore work for every geometry.
+
+| `noz_type` | Shape | Keys |
+|---|---|---|
+| `"capillary"` | straight tube | `throat_diam_mm`, `throat_length_mm`, `n_axial_tube` |
+| `"cd_nozzle"` | conical converging–diverging nozzle | below |
+| `"profile"` | any wall, from a table of (x, r) points | below |
+
+To build and inspect a mesh without setting up SU2:
+
+```bash
+python su2/mesh.py my_case.toml                 # runs/<name>/mesh/: mesh.geo, mesh.su2, mesh_quality.txt
+python su2/mesh.py my_case.toml --out /tmp/m --coarsen 2
+```
+
+The wall must be single-valued: one radius at each x, positive from the inlet to the exit.
+That covers nozzles and capillaries, but not re-entrant shapes (a skimmer, a wall that folds
+back), which would need an unstructured mesh.
+
 ### Geometry and mesh (`noz_type = "capillary"`)
 
 The model is 2D axisymmetric: x runs along the axis, y is the radius, and the capillary exit
@@ -218,7 +250,7 @@ the wall nodes lie within about 10 nm of it. The geometry stops with a clear mes
 can't be built, for example when the inlet or exit is too small for the throat arcs.
 `examples/cd_nozzle_n2.toml` is a complete example case.
 
-**Thin cells in the chamber** (optional keys). By default every cell next to the wall, the exit
+**Thin cells in the chamber** (optional keys, any `noz_type`). By default every cell next to the wall, the exit
 plane and the lip is `first_cell_um` thin, and two rows of these continue through the chamber
 as cells that are millimetres long: along the lip line out to the outlet, and up the faceplate
 to the chamber top. At very low back pressure (0.125 Pa for the N₂ nozzle) the gas viscosity is
@@ -250,6 +282,36 @@ lip_relax_cell_um = [1.0, 10.0, 50.0, 100.0]  # radial cell at the lip line at e
   jump mid-way along the diverging section.
 - Both change the mesh, so an old `restart_flow.dat` no longer fits; interpolate it with
   `su2/remap_restart.py` ([Starting from a coarse mesh](#starting-from-a-coarse-mesh)).
+
+### Geometry from a table of points (`noz_type = "profile"`)
+
+```toml
+[geometry]
+noz_type = "profile"
+profile_file = "my_nozzle.csv"   # relative to the case file
+profile_units = "mm"             # "mm" (default) or "m"
+throat_diam_mm = 0.5             # still needed: the length unit D of the handoff and SPARTA
+```
+
+- **The file:** two columns, x and the wall radius r, from the inlet to the exit. Commas, tabs
+  or spaces work; a header line and `#` comments are skipped. x must increase. It is shifted so
+  the last point, the exit, is at x = 0.
+- **The wall between points** is a monotone cubic (PCHIP): it passes through every point
+  without overshooting. Add points where the wall curves sharply.
+- **Sections:** the throat is the narrowest point (the last one, if a stretch is equally
+  narrow).
+  - inlet → throat: `n_axial_conv` cells clustered at the throat (`throat_cell_um`, default R_t/20);
+  - throat → exit: `n_axial_div` cells in two sections, clustered at the throat and at the exit
+    (`exit_cell_um`);
+  - a wall that narrows all the way to the exit, or a straight tube, is one section of
+    `n_axial_conv` cells clustered at the exit.
+- **`throat_diam_mm`** must still be given. Setup warns if it differs from the profile's
+  narrowest diameter by more than 1%.
+
+**CAD geometry** goes through the same route. Anything that gives the wall of an axisymmetric
+half-section as (x, r) points can be written to such a file, for example a curve exported from
+CAD, or sampled from a STEP file with gmsh's OpenCASCADE reader. A direct CAD provider would be
+a new `su2/geom/` module that does that sampling itself.
 
 ### Mesh quality
 
@@ -357,9 +419,11 @@ The `[case]`, `[geometry]` and `[gas]` sections are described in the
 
 ## Extending
 
-- **New nozzle shape:** add `su2/geom/<name>.py` with a function
-  `geo(case: dict, source: str) -> str` that returns the gmsh `.geo` text. It must define the
-  physical curves `inlet`, `wall`, `faceplate`, `axis` and `outlet`, and a physical surface.
-  Then set `noz_type = "<name>"`.
+- **New nozzle shape:** add `su2/geom/<name>.py` with `shape(case) -> su2.mesh.Shape`. A
+  `Shape` has the wall radius `r(x)` (exit plane at x = 0) and a list of `Section(x0, x1, n,
+  fine, h, straight)` from the inlet to the exit: `n` axial cells, clustered toward `fine`
+  (`"start"`, `"end"` or `"none"`) with first cell `h` (`None` means `exit_cell_um`), and
+  `straight=True` for a straight wall. The mesher does the rest. Then set
+  `noz_type = "<name>"`. `profile.py` is the shortest example.
 - **New gas:** add an entry to `GASES` in `su2/setup.py`, keyed by the species file stem.
   Add the matching SPARTA files too; see [sparta/README.md](../sparta/README.md#extending).

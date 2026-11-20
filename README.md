@@ -146,7 +146,7 @@ These sections are shared by both stages:
 name = "ASDEX_capil_02"        # run directory name
 
 [geometry]
-noz_type = "capillary"         # or "cd_nozzle"; -> su2/geom/<noz_type>.py
+noz_type = "capillary"         # or "cd_nozzle", or "profile" (wall from an (x, r) table); -> su2/geom/<noz_type>.py, meshed by su2/mesh.py
 throat_diam_mm = 0.4           # capillary inner diameter D; many lengths are given in units of D
 throat_length_mm = 66          # capillary length L
 dim = 2                        # only 2 / "axial" is implemented

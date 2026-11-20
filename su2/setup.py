@@ -9,10 +9,7 @@ cheap first solution to start the full mesh from (run_case.sh stage su2_refine).
 import argparse
 import copy
 import math
-import importlib
-import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -20,7 +17,7 @@ if __package__ in (None, ""):  # allow `python su2/setup.py` as well as `-m su2.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lib.common import die, fmt, get, load_case, log
-from su2 import mesh_quality
+from su2 import mesh
 
 # Continuum gas properties, keyed by the species file stem (sparta/data/<key>.species/.vss).
 # he, ar: Sutherland matched to the DSMC VSS viscosity at 273 K only. It is 16-60% low
@@ -42,30 +39,6 @@ GASES = {
     "d2": dict(gamma=1.4, R=2064.06, mu_ref=1.1716e-5, T_ref=273.15, S=14.5, Pr=0.71),
     "n2": dict(gamma=1.4, R=296.80, mu_ref=1.6616e-5, T_ref=273.15, S=40.75, Pr=0.71),
 }
-
-
-def write_mesh(case: dict, case_path: Path, run_dir: Path):
-    """Write mesh.geo with the nozzle's geometry generator, then mesh it with gmsh."""
-    noz = get(case, "geometry", "noz_type")
-    try:
-        gen = importlib.import_module(f"su2.geom.{noz}")
-    except ModuleNotFoundError:
-        die(f"no geometry generator for noz_type={noz} (su2/geom/{noz}.py)")
-
-    geo = run_dir / "mesh.geo"
-    geo.write_text(gen.geo(case, source=str(case_path)))
-
-    gmsh_log = run_dir / "gmsh.log"
-    with open(gmsh_log, "w") as f:
-        r = subprocess.run(["gmsh", str(geo), "-2", "-format", "su2",
-                            "-o", str(run_dir / "mesh.su2")], stdout=f, stderr=subprocess.STDOUT)
-    if r.returncode != 0:
-        print("\n".join(gmsh_log.read_text().splitlines()[-10:]), file=sys.stderr)
-        die(f"gmsh failed, see {gmsh_log}")
-
-    with open(run_dir / "mesh.su2") as f:
-        nelem = next((m.group(1) for line in f if (m := re.match(r"NELEM=\s*(\d+)", line))), "?")
-    log(f"mesh: {nelem} cells")
 
 
 def ideal_massflow(case: dict) -> float:
@@ -230,11 +203,7 @@ def setup(case_path, runs_dir="runs", coarsen=1) -> Path:
         log(f"coarsened {coarsen}x: " + ", ".join(f"{k} = {case['su2'][k]}"
                                                 for k in COUNT_KEYS + SIZE_KEYS if k in case["su2"]))
 
-    write_mesh(case, case_path, run_dir)
-    qfile, flagged = mesh_quality.write(run_dir / "mesh.su2")
-    for w in flagged:
-        log(f"WARNING: {w}")
-    log(f"wrote {qfile}")
+    mesh.write_mesh(case, case_path, run_dir)  # mesh.geo, mesh.su2, gmsh.log, mesh_quality.txt
     (run_dir / "su2.cfg").write_text(su2_config(case, case_path.name))
     log(f"wrote {run_dir / 'su2.cfg'}")
     return run_dir

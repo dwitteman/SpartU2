@@ -1,0 +1,40 @@
+Info    : Running 'gmsh runs/ASDEX_capil_d2/su2/mesh.geo -2 -format su2 -o runs/ASDEX_capil_d2/su2/mesh.su2' [Gmsh 4.14.0-git, 1 node, max. 1 thread]
+Info    : Started on Fri Nov 20 17:15:26 2026
+Info    : Reading 'runs/ASDEX_capil_d2/su2/mesh.geo'...
+Info    : Done reading 'runs/ASDEX_capil_d2/su2/mesh.geo'
+Info    : Meshing 1D...
+Info    : [  0%] Meshing curve 1 (Line)
+Info    : [ 10%] Meshing curve 2 (Line)
+Info    : [ 20%] Meshing curve 3 (Line)
+Info    : [ 20%] Meshing curve 4 (Line)
+Info    : [ 30%] Meshing curve 5 (Line)
+Info    : [ 30%] Meshing curve 6 (Line)
+Info    : [ 40%] Meshing curve 7 (Line)
+Info    : [ 40%] Meshing curve 8 (Line)
+Info    : [ 50%] Meshing curve 9 (Line)
+Info    : [ 50%] Meshing curve 10 (Line)
+Info    : [ 60%] Meshing curve 11 (Line)
+Info    : [ 60%] Meshing curve 12 (Line)
+Info    : [ 70%] Meshing curve 13 (Line)
+Info    : [ 70%] Meshing curve 14 (Line)
+Info    : [ 80%] Meshing curve 15 (Line)
+Info    : [ 80%] Meshing curve 16 (Line)
+Info    : [ 90%] Meshing curve 17 (Line)
+Info    : [ 90%] Meshing curve 18 (Line)
+Info    : [100%] Meshing curve 19 (Line)
+Info    : [100%] Meshing curve 20 (Line)
+Info    : Done meshing 1D (Wall 0.0132028s, CPU 0.009965s)
+Info    : Meshing 2D...
+Info    : [  0%] Meshing surface 1 (Transfinite)
+Info    : [ 20%] Meshing surface 2 (Transfinite)
+Info    : [ 30%] Meshing surface 3 (Transfinite)
+Info    : [ 50%] Meshing surface 4 (Transfinite)
+Info    : [ 60%] Meshing surface 5 (Transfinite)
+Info    : [ 80%] Meshing surface 6 (Transfinite)
+Info    : [ 90%] Meshing surface 7 (Transfinite)
+Info    : Done meshing 2D (Wall 0.00956398s, CPU 0.001181s)
+Info    : 105341 nodes 107514 elements
+Info    : Writing 'runs/ASDEX_capil_d2/su2/mesh.su2'...
+Info    : Writing 104000 elements and 105341 nodes
+Info    : Done writing 'runs/ASDEX_capil_d2/su2/mesh.su2'
+Info    : Stopped on Fri Nov 20 17:15:27 2026 (From start: Wall 0.133745s, CPU 0.136057s)

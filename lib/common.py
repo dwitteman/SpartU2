@@ -21,7 +21,17 @@ def load_case(path) -> dict:
     if not path.is_file():
         die(f"case file {path} not found")
     with open(path, "rb") as f:
-        return tomllib.load(f)
+        case = tomllib.load(f)
+    case["_path"] = str(path.resolve())  # so files named in the case resolve next to it
+    return case
+
+
+def case_file(case: dict, name: str) -> Path:
+    """A file named in the case: absolute, or relative to the case file's directory."""
+    p = Path(name)
+    if p.is_absolute() or "_path" not in case:
+        return p
+    return Path(case["_path"]).parent / p
 
 
 def get(case: dict, section: str, key: str, default=_MISSING):

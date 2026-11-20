@@ -1,0 +1,62 @@
+# ASDEX capillary: 0.4 mm x 66 mm tube, D2 from a 1 bar plenum into a 10 x 5 cm chamber.
+#
+# Run (from the repo root; see su2/README.md):
+#   export CASE=examples/ASDEX_Capil_d2.toml
+#   # 1. coarse mesh first: cheap, and a far better start than gas at rest
+#   COARSEN=4 BACK_PRES=1000 STAGES="su2_setup su2" bash run_case.sh
+#   #    then step the back pressure down on the coarse mesh, a restart each:
+#   COARSEN=4 BACK_PRES=100 STAGES=su2_restart bash run_case.sh   # ... 10, 1, 0.1
+#   # 2. full mesh from the coarse solution (the back pressure comes from back_pres_pa below)
+#   FROM=4 STAGES="su2_setup su2_refine" CFL_MAX=500 bash run_case.sh
+#   # 3. once converged: STAGES="handoff sparta_setup" bash run_case.sh, then SPARTA
+# Convergence: watch the inlet/outlet mass flows go flat in su2.log, not just rms[Rho].
+
+[case]
+name = "ASDEX_capil_d2"
+
+[geometry]
+noz_type = "capillary"
+throat_diam_mm = 0.4          # tube inner diameter D; lengths "in D" elsewhere use this
+throat_length_mm = 66         # tube length L
+
+dim = 2
+symmetry = "axial"
+chamb_length_cm = 10
+chamb_height_cm = 5
+
+[gas]
+species_file = "d2.species"
+plen_pres_pa = 1.0e5
+plen_temp_K = 300.15
+
+[su2]
+back_pres_pa = 0.1            # final outlet pressure (SU2 cannot do 0); step down to it, see above
+wall_temp_K = 300.15
+faceplate = "wall"            # "wall" (isothermal) or "sym" (slip, no exit-plane wall)
+# mesh: structured quad blocks (su2/mesh.py); check runs/<name>/su2/mesh_quality.txt after setup
+first_cell_um = 1.0           # radial cell at the tube wall and the lip
+exit_cell_um = 10.0           # axial cell either side of the exit plane; 1 um would run up the
+                              # faceplate as 1 um x mm cells that freeze at low back pressure
+n_radial_tube = 40            # cells across the tube radius (uniform spacing would be 5 um)
+n_axial_tube = 800            # cells along the tube, clustered at the exit
+n_axial_ext = 300             # cells downstream of the exit, clustered at the exit
+n_radial_ext = 200            # cells from the lip to the chamber radius, clustered at the lip
+# Lip-line cell along the chamber: 1 um at the lip, 5 um (the tube's uniform radial spacing)
+# from 10 mm on. Without it the 1 um row reaches aspect ratio ~2600 at the outlet; much past
+# 5 um leaves a size jump across the lip line, since the cells below it are at most 5 um.
+lip_relax_x = [0.02, 0.1, 1.0]           # stations, fractions of the chamber length
+lip_relax_cell_um = [1.0, 5.0, 5.0]      # radial cell at the lip line at each station
+iterations = 25000
+
+[sparta]
+# DSMC domain: from the coupling plane to the end of the chamber, axis to chamber radius.
+x_couple_D = 4                # coupling plane, throat diameters downstream of the exit ("auto": from Kn_GLL)
+# breakdown_module = "handoff.breakdown_2d"   # Boyd's full Kn_GLL over each plane; default: axis only
+base_grid = [200, 100]        # level-1 cells (x, r); refined 2x2 per level from the SU2 field
+cells_per_mfp = 3             # refine until cell size <= local mean free path / this
+ppc_target = 20               # particles per refined cell used to choose fnum
+fnum = "auto"                 # or a number; auto = from ppc_target
+timestep_s = "auto"           # or a number; auto = min(0.2 tau_coll, 0.5 cell transit)
+# hold_steps = 400000         # transient hold before averaging (~ one box transit, see setup.log)
+# chamber = "pump"            # chamber end and outer wall as pumped walls (sparta/README.md)
+# pump_pres_pa = 0.1          #   target chamber pressure
