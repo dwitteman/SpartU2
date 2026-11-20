@@ -9,6 +9,8 @@
 #   su2_setup       mesh + su2.cfg                                  -> runs/<name>/su2/
 #   su2             SU2_CFD from the initial state                  -> flow.vtu, restart_flow.dat
 #   su2_restart     SU2_CFD from restart_flow.dat (old results copied to su2/archive/<n>/ first)
+#   su2_refine      SU2_CFD from the solution in su2_coarse<FROM>/, interpolated onto this mesh
+#                   by su2/remap_restart.py (old results archived first, as for su2_restart)
 #   handoff         coupling plane + inflow.sparta from flow.vtu    -> runs/<name>/handoff/
 #   sparta_setup    grid + in.sparta + in.continue                  -> runs/<name>/sparta/
 #   sparta          SPARTA from an empty box (hold, grid adaptation, averaged run)
@@ -19,7 +21,10 @@
 #   STAGES    stages to run, space separated
 #   NP        MPI ranks (default: $NCPUS from PBS Pro, else lines in $PBS_NODEFILE, else nproc)
 #   MPIRUN    launcher (default: "mpirun -np $NP")
-#   SU2_ITER  ITER for su2 / su2_restart (default: keep the value in su2.cfg)
+#   COARSEN   N: su2_setup builds, and the su2 stages run, an N-times coarser mesh in
+#             runs/<name>/su2_coarse<N>/ (default 1: the full mesh in su2/)
+#   FROM      N for su2_refine: start from runs/<name>/su2_coarse<N>/restart_flow.dat
+#   SU2_ITER  ITER for su2 / su2_restart / su2_refine (default: keep the value in su2.cfg)
 #   BACK_PRES outlet back pressure [Pa] for su2 / su2_restart (default: keep the value in su2.cfg),
 #             e.g. step it down over several su2_restart runs to converge a low back pressure
 #   CFL_MAX   largest adaptive CFL for su2 / su2_restart (default: keep su2.cfg's, 100 from setup);
@@ -30,7 +35,8 @@
 #   ENV_FILE  bash file sourced first, e.g. module loads and a Python venv on a cluster
 #             (default: hpc_env.sh in the repo root, if it exists; see hpc_env.sh.example)
 #
-# Each stage stops the script on failure. Solver output: su2/su2.log, sparta/log.sparta
+# Each stage stops the script on failure. Solver output: su2/su2.log (also shown on screen when
+# run from a terminal; otherwise follow it with tail -f), sparta/log.sparta
 # (a continuation writes sparta/log.<from>-<to>.sparta). Memory: check the particle
 # estimate in sparta/setup.log against the memory you request from PBS.
 
@@ -69,7 +75,8 @@ c = tomllib.load(open(sys.argv[1], "rb"))
 print(c.get(sys.argv[2], {}).get(sys.argv[3], sys.argv[4]))' "$CASE" "$1" "$2" "$3"
 }
 NAME=$(case_value case name "")
-SU2_DIR=$RUNS/$NAME/su2
+COARSEN=${COARSEN:-1}
+if [[ $COARSEN == 1 ]]; then SU2_DIR=$RUNS/$NAME/su2; else SU2_DIR=$RUNS/$NAME/su2_coarse$COARSEN; fi
 SPA_DIR=$RUNS/$NAME/sparta
 
 # su2_set KEY VALUE: set "KEY= VALUE" in su2.cfg
@@ -79,15 +86,24 @@ for stage in $STAGES; do
     echo "=== $stage: case $NAME, $NP ranks, $(date '+%F %T') ==="
     case $stage in
         su2_setup)
-            "$PY" su2/setup.py "$CASE" --runs "$RUNS" ;;
-        su2 | su2_restart)
-            if [[ $stage == su2_restart ]]; then
+            "$PY" su2/setup.py "$CASE" --runs "$RUNS" --coarsen "$COARSEN" ;;
+        su2 | su2_restart | su2_refine)
+            if [[ $stage == su2_refine ]]; then
+                : "${FROM:?set FROM=N to start from runs/<name>/su2_coarse<N>/}"
+                src=$RUNS/$NAME/su2_coarse$FROM/restart_flow.dat
+                [[ -f $src ]] || { echo "ERROR: no $src" >&2; exit 1; }
+            elif [[ $stage == su2_restart ]]; then
                 [[ -f $SU2_DIR/restart_flow.dat ]] || { echo "ERROR: no $SU2_DIR/restart_flow.dat" >&2; exit 1; }
+            fi
+            if [[ $stage != su2 ]]; then
                 n=1; while [[ -d $SU2_DIR/archive/$n ]]; do n=$((n + 1)); done
                 mkdir -p "$SU2_DIR/archive/$n"
                 for f in flow.vtu history.csv su2.log restart_flow.dat su2.cfg; do
                     if [[ -f $SU2_DIR/$f ]]; then cp -p "$SU2_DIR/$f" "$SU2_DIR/archive/$n/"; fi
                 done
+                if [[ $stage == su2_refine ]]; then
+                    "$PY" su2/remap_restart.py "$src" "$SU2_DIR/mesh.su2" -o "$SU2_DIR/restart_flow.dat"
+                fi
                 su2_set RESTART_SOL YES
             else
                 su2_set RESTART_SOL NO
@@ -99,7 +115,11 @@ for stage in $STAGES; do
             fi
             if [[ -n ${CFL_MAX:-} ]]; then su2_set CFL_ADAPT_PARAM "( 0.5, 1.2, 0.5, $CFL_MAX )"; fi
             grep -E '^(RESTART_SOL|ITER|MARKER_OUTLET|CFL_ADAPT_PARAM)=' "$SU2_DIR/su2.cfg"
-            (cd "$SU2_DIR" && $MPIRUN "$SU2_CFD" su2.cfg > su2.log 2>&1) ;;
+            if [[ -t 1 ]]; then  # interactive: show SU2's screen output too (pipefail keeps its exit code)
+                (cd "$SU2_DIR" && $MPIRUN "$SU2_CFD" su2.cfg 2>&1 | tee su2.log)
+            else
+                (cd "$SU2_DIR" && $MPIRUN "$SU2_CFD" su2.cfg > su2.log 2>&1)
+            fi ;;
         handoff)
             "$PY" handoff/handoff.py "$CASE" --runs "$RUNS" ;;
         sparta_setup)

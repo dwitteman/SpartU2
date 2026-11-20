@@ -1,0 +1,60 @@
+# Example case: conical converging-diverging nozzle, nitrogen, into a chamber at .125 pa, viewing a 12x6cm region.
+# The nozzle dimensions are illustrative; replace them with the real nozzle.
+#   python su2/setup.py examples/cd_nozzle_d2.toml
+
+[case]
+name = "cd_n2_4kpa_0p125pa_coarse"
+
+[geometry]
+noz_type = "cd_nozzle"
+throat_diam_mm = 0.5          # D_t; lengths "in D" elsewhere (e.g. x_couple_D) use this
+inlet_diam_mm = 2.0           # start of the converging cone (inlet boundary)
+exit_diam_mm = 13.0            # A_e/A_t = 16
+conv_half_angle_deg = 2.5
+div_half_angle_deg = 10
+throat_rc_D = 1.0             # radius of the arcs blending the cones into the throat, in D_t
+throat_length_mm = 1.5        # optional straight throat section
+
+dim = 2
+symmetry = "axial"
+chamb_length_cm = 12.0
+chamb_height_cm = 6.0
+
+[gas]
+species_file = "n2.species"
+plen_pres_pa = 4225
+plen_temp_K = 293.15
+
+[su2]
+back_pres_pa = 0.125
+wall_temp_K = 293.15
+faceplate = "wall"
+first_cell_um = 1.0           # radial cell at the wall and the lip
+exit_cell_um = 10.0           # axial cell either side of the exit plane (default first_cell_um); 1 um ran
+                              # up the faceplate as 1 um x 2 mm cells that froze at the initial state
+throat_cell_um = 10.0         # axial cell size at the throat (default R_t/20)
+n_radial_tube = 40            # cells from wall to axis inside the nozzle
+n_axial_conv = 120            # inlet -> throat, clustered at the throat
+n_axial_div = 200             # throat -> exit, split in two blocks clustered at each end
+n_axial_ext = 150             # exit plane -> outlet
+n_radial_ext = 100            # lip -> chamber radius
+# Coarsen the lip-line cell soon after the exit: 1 um cells stretched to mm lengths along the lip
+# line froze (a ridge, then a trough at the initial pressure) at 0.125 Pa back pressure.
+lip_relax_x = [0.02, 0.1, 0.3, 1.0]           # stations, fractions of the chamber length
+lip_relax_cell_um = [1.0, 10.0, 50.0, 100.0]  # radial cell at the lip line at each station
+iterations = 250000
+
+[sparta]
+x_couple_D = "auto"           # couple_margin_D upstream of breakdown, inside the nozzle if it happens there; or a number of D from the exit
+# couple_margin_D = 1          # with "auto": how far upstream of breakdown, in throat diameters
+breakdown_module = "handoff.breakdown_2d"   # Boyd's full Kn_GLL over each plane; default: axis only
+base_grid = [200, 100]
+cells_per_mfp = 3
+ppc_target = 20
+hold_steps = 450000           # transient hold (~ one box transit) before averaging; then the grid adapts to the particles
+run_steps = 20000             # averaged run after the hold
+output_every = 20000          # flow dump interval; must divide hold_steps and run_steps
+restart_every = 50000         # restart file interval
+image_every = 20000           # image.<step>.ppm of log10 density during the hold (25 pictures)
+fnum = "auto"
+timestep_s = "auto"

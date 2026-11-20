@@ -182,6 +182,7 @@ for large chambers it is tens of thousands.
 | `in.sparta` | the coupled DSMC run: grid, gas, inflow, averaging, dumps and restart files |
 | `in.continue` | continues from the latest `restart.<step>.sparta` up to `-var target <step>` |
 | `<gas>.species`, `<gas>.vss` | copied from `sparta/data/` |
+| `gas.species`, `gas.vss` | with a background gas: the beam and background species together (a background species that is the beam gas gets its own ID, e.g. `N2bg`) |
 | `setup.log` | setup summary and warnings |
 | `case.toml` | copy of the case file |
 
@@ -197,7 +198,7 @@ for large chambers it is tens of thousands.
 | r | from 0 to `chamb_height_cm` |
 | `xlo` | coupling plane: open, and carries the SU2 inflow |
 | `ylo` | axis (`a`, axisymmetric) |
-| `xhi`, `yhi` | open, matching the SU2 outlet |
+| `xhi`, `yhi` | the chamber end and outer wall: open by default, matching the SU2 outlet; or pumped walls, or a background-gas reservoir ([Chamber pressure](#chamber-pressure-and-background-gas)) |
 | walls | only when x_c < 0 (the plane is inside the nozzle or capillary): the wall from x_c to the exit and the faceplate (x = 0, lip to chamber radius), diffuse at `[su2] wall_temp_K` |
 
 **Plane inside the nozzle.** Setup writes the nozzle body as one closed outline,
@@ -211,6 +212,53 @@ from faces beyond the table or from cell faces touching the solid. After `read_r
 The throat is the densest part of the flow, so a plane there sets the finest cells and the
 timestep. Expect many more levels than the 6 a 32-bit SPARTA build allows (see below) and a
 timestep of order 1e-10 s, with millions of steps for gas to cross the chamber.
+
+### Chamber pressure and background gas
+
+`chamber` sets what the chamber end (`xhi`) and outer wall (`yhi`) do:
+
+| `chamber` | Faces | Chamber pressure |
+|---|---|---|
+| `"outflow"` (default) | open: every particle that reaches them leaves | whatever the jet leaves behind |
+| `"pump"` | diffuse walls at `pump_temp_K` (default `[su2] wall_temp_K`) that remove a fraction f of the molecules hitting them (`surf_react global f 0`) | set by the balance of jet and pump |
+| `"reservoir"` | open, and inject still background gas at `background_pres_pa`, `background_temp_K` (`fix emit/face`) | held at `background_pres_pa`, with the background's composition |
+
+**Pumped walls** model the chamber the way Bi et al. did in OpenFOAM. At steady state the
+pumped rate equals the jet's inflow Ṅ:
+
+  f · (n c̄ / 4) · A = Ṅ,   with A = π R² + 2π R (x_hi − x_lo), the end disc plus the outer cylinder,
+
+so the chamber pressure is p = 4 Ṅ k T / (f c̄ A). Give either `pump_fraction` (f) or
+`pump_pres_pa` (p), and setup works out the other from the SU2 mass flow at the plane; both are
+in `setup.log` and `in.sparta`. For the 4 kPa N₂ nozzle (Ṅ ≈ 2.4e19 /s, 12 × 6 cm chamber),
+0.125 Pa needs f ≈ 0.12, Bi et al.'s value. The background is the beam gas itself, scattered
+and thermalised by the walls.
+
+**A reservoir** holds the chamber at a set pressure and composition, so the beam's interaction
+with a different background gas can be studied:
+- `background_gas` gives species (`sparta/data` stems) and mole fractions, e.g.
+  `{ ar = 1.0 }` or `{ ar = 0.8, he = 0.2 }`; the default is the beam gas.
+- The beam inflow then uses its own mixture (`beam`) and the background its own (`bg`). A
+  background species that is the beam gas gets its own ID (`N2bg`), so beam and background
+  molecules are counted separately even when they are the same gas.
+- With more than one species the flow dumps get per-species columns after `g_lambda`:
+  n, u, v for each species, then T for each (listed in a comment in `in.sparta`). The hold
+  images (particle style) colour the species differently.
+- The faces emit a still Maxwellian at the reservoir state and remove everything that
+  reaches them. With no jet this gives exactly the reservoir's density and temperature in the
+  chamber; the jet's own gas leaves freely.
+
+**Both modes:**
+- **Starting state:** they start the chamber filled at the target state (`create_particles`;
+  `fill = false` starts it empty). Filling a 12 × 6 cm chamber through the pump alone takes
+  about 1.7 ms, around 10⁶ steps.
+- **Grid sizing:** the grid is sized for the SU2 density plus the background (pump: at least
+  the chamber pressure), since a denser chamber has a shorter mean free path.
+- **Continuations:** `in.continue` re-issues the wall and reservoir models, which restart
+  files don't store.
+- **Faceplate:** when the coupling plane is in the chamber (x_c ≥ 0), the part of `xlo`
+  outside the jet is still open, so it leaks chamber gas; with the plane inside the nozzle the
+  faceplate is a diffuse wall.
 
 ### Grid
 
@@ -345,6 +393,14 @@ timestep_s = "auto"            # or a number; optional
 # image_avg_steps = 100        # density: average over this many steps before each image; optional
 # image_width = 1600           # pixels; the height follows the domain's aspect ratio; optional
 # image_log_range = [18, 23]   # density: log10 n [1/m3] for white and navy; optional, default 5 decades below the SU2 maximum
+# chamber = "outflow"          # "outflow", "pump" or "reservoir" (chamber end and outer wall); optional
+# pump_fraction = 0.12         # pump: share of wall hits removed; or instead
+# pump_pres_pa = 0.125         # pump: target chamber pressure, sets pump_fraction from the SU2 mass flow
+# pump_temp_K = 293.15         # pump: wall temperature; optional, default [su2] wall_temp_K
+# background_pres_pa = 0.125   # reservoir: chamber pressure
+# background_temp_K = 293.15   # reservoir: optional, default [su2] wall_temp_K
+# background_gas = { ar = 1.0 }  # reservoir: species and mole fractions; optional, default the beam gas
+# fill = true                  # pump/reservoir: start the chamber at the target state; optional
 ```
 
 The coupling-plane keys (`x_couple_D`, `couple_margin_D`, `kn_breakdown`, `breakdown_module`)
@@ -363,6 +419,7 @@ The `[case]`, `[geometry]` and `[gas]` sections are described in the
 | `inflow.py` | samples SU2 on the coupling plane, writes the `fix emit/face/file` table, Maxwellian fluxes (used by the handoff) |
 | `grid.py` | refinement (`build`), SPARTA cell IDs, `read_grid` file writer |
 | `surf.py` | nozzle wall + faceplate outline (`nozzle.surf`) when the plane is inside the nozzle |
+| `chamber.py` | chamber end and outer wall: outflow, pumped walls (`surf_react global`) or background reservoir (`fix emit/face`); species files and per-species output for a background gas |
 | `gas.py` | reads `.species`/`.vss` files; VSS mean free path, viscosity and mean thermal speed |
 | `data/` | `he`, `ar`, `d2` and `n2` species and VSS files |
 | `../handoff/breakdown_gll.py` | Kn_GLL breakdown parameter (default `breakdown_module`); see [handoff/README.md](../handoff/README.md) |

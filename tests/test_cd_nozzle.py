@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from su2.geom import capillary, cd_nozzle
+from su2.mesh_quality import read_su2
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE = {
@@ -76,28 +77,6 @@ def test_profile_rejects_impossible_geometry(bad, match):
 
 # ---- gmsh mesh ------------------------------------------------------------------------
 
-def read_su2(path):
-    """(points, quads, {marker: line elements}) from an SU2 mesh file."""
-    lines = Path(path).read_text().splitlines()
-    pts, quads, marks, i = None, None, {}, 0
-    while i < len(lines):
-        s = lines[i].strip()
-        if s.startswith("NELEM="):
-            n = int(s.split("=")[1])
-            quads = np.array([[int(v) for v in l.split()[1:5]] for l in lines[i + 1:i + 1 + n]])
-            i += n
-        elif s.startswith("NPOIN="):
-            n = int(s.split("=")[1].split()[0])
-            pts = np.array([[float(v) for v in l.split()[:2]] for l in lines[i + 1:i + 1 + n]])
-            i += n
-        elif s.startswith("MARKER_TAG="):
-            tag, n = s.split("=")[1].strip(), int(lines[i + 1].split("=")[1])
-            marks[tag] = np.array([[int(v) for v in l.split()[1:3]] for l in lines[i + 2:i + 2 + n]])
-            i += n + 1
-        i += 1
-    return pts, quads, marks
-
-
 def mesh(tmp_path, gen, c):
     if not shutil.which("gmsh"):
         pytest.skip("gmsh not on PATH")
@@ -148,3 +127,68 @@ def test_capillary_mesh_still_builds(tmp_path):
     pts, quads, marks = mesh(tmp_path, capillary, c)
     assert len(quads) == 10 * 40 + 10 * 30 + 20 * 30
     assert set(marks) == {"inlet", "wall", "faceplate", "axis", "outlet"}
+
+
+# ---- chamber lip-line relaxation ---------------------------------------------------------
+
+def relaxed(x=(0.5, 0.75, 1.0), cells=(1.0, 10.0, 50.0)):
+    c = case()
+    c["su2"].update(lip_relax_x=list(x), lip_relax_cell_um=list(cells))
+    return c
+
+
+def test_chamber_stations_snap_to_axial_nodes():
+    st = cd_nozzle.chamber_stations(relaxed(), 0.01, 1e-6, 40)
+    assert [s[2] for s in st] == pytest.approx([1e-6, 1e-6, 1e-5, 5e-5])
+    assert st[0][:2] == (0, 0.0) and st[-1][:2] == (40, 0.01)
+    g = cd_nozzle.growth_rate(0.01, 40, 1e-6)
+    for i, x, _ in st:  # each station is a node of the unsplit geometric distribution
+        assert x == pytest.approx(1e-6 * (g**i - 1) / (g - 1), rel=1e-6)
+    # no keys: one block, first_cell everywhere
+    assert cd_nozzle.chamber_stations(case(), 0.01, 1e-6, 40) == [(0, 0.0, 1e-6), (40, 0.01, 1e-6)]
+    # last station short of the outlet: the cell is held constant to the outlet
+    st = cd_nozzle.chamber_stations(relaxed((0.5, 0.75), (1.0, 10.0)), 0.01, 1e-6, 40)
+    assert st[-1][1:] == pytest.approx((0.01, 1e-5))
+
+
+@pytest.mark.parametrize("x, cells", [((0.5, 0.75), (1.0,)), ((0.75, 0.5), (1.0, 10.0)),
+                                      ((0.5, 1.5), (1.0, 10.0)), ((0.5, 0.75), (1.0, 0.0)),
+                                      ((0.9, 0.9001), (1.0, 10.0))])
+def test_chamber_stations_reject_bad_keys(x, cells):
+    with pytest.raises(SystemExit):
+        cd_nozzle.chamber_stations(relaxed(x, cells), 0.01, 1e-6, 40)
+
+
+def test_relaxed_mesh(tmp_path):
+    pts, quads, marks = mesh(tmp_path, cd_nozzle, relaxed())
+    (tmp_path / "base").mkdir()
+    base = mesh(tmp_path / "base", cd_nozzle, case())
+    # same cells and boundary faces as the unrelaxed mesh
+    assert len(quads) == len(base[1])
+    assert {k: len(v) for k, v in marks.items()} == {k: len(v) for k, v in base[2].items()}
+    q = pts[quads]
+    area = 0.5 * np.sum(q[..., 0] * np.roll(q[..., 1], -1, 1) - np.roll(q[..., 0], -1, 1) * q[..., 1], 1)
+    assert np.all(area > 0) or np.all(area < 0)
+
+    # radial cell at the lip line: first_cell_um at the exit plane, the last value at the outlet
+    R_e = 1e-3
+
+    def lip_cell(x0):
+        r = np.sort(pts[np.abs(pts[:, 0] - x0) < 1e-12, 1])
+        k = np.argmin(np.abs(r - R_e))
+        return r[k + 1] - r[k], r[k] - r[k - 1]
+    assert lip_cell(0.0)[0] == pytest.approx(1e-6, rel=1e-3)
+    x_out = pts[np.unique(marks["outlet"].ravel()), 0].max()
+    assert lip_cell(x_out) == pytest.approx((5e-5, 5e-5), rel=1e-3)
+
+
+def test_exit_cell_sets_the_axial_cell_at_the_exit_plane(tmp_path):
+    c = case()
+    c["su2"]["exit_cell_um"] = 10.0
+    pts, quads, marks = mesh(tmp_path, cd_nozzle, c)
+    ax = np.sort(pts[np.unique(marks["axis"].ravel()), 0])
+    k = np.argmin(np.abs(ax))  # the exit plane on the axis
+    assert ax[k + 1] - ax[k] == pytest.approx(10e-6, rel=1e-3)  # chamber side
+    assert ax[k] - ax[k - 1] == pytest.approx(10e-6, rel=1e-3)  # nozzle side
+    r_in = np.sort(pts[np.unique(marks["inlet"].ravel()), 1])
+    assert r_in[-1] - r_in[-2] == pytest.approx(1e-6, rel=1e-3)  # wall cell still first_cell_um

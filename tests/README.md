@@ -20,12 +20,16 @@ for example `from handoff import breakdown_gll` or `from sparta.gas import Gas`.
 |---|---|
 | `test_breakdown_gll.py` | `handoff/breakdown_gll.py`: Kn_GLL breakdown parameter |
 | `test_breakdown_2d.py` | `handoff/breakdown_2d.py`: mesh gradients exact for linear fields; Kn = λ/L for exponential density in x and r; speed term divided by the sound speed at rest; mass-flow quantile and plane mass flow; the report flags a broken-down plane and writes both files; on the N₂ nozzle, axis continuum but outer jet not (skipped without that run) |
-| `test_cd_nozzle.py` | `su2/geom/cd_nozzle.py`: wall profile (ends, throat, smoothness, cone angles, bad input) and gmsh mesh (cell counts, boundary markers, cell validity and skew, wall nodes on the profile, first wall cell); also that the capillary mesh still builds |
-| `test_su2_config.py` | `su2/setup.py` convergence settings: ideal choked mass flow, the mass-flow Cauchy tolerance scales with the flow, and `CONV_FIELD` uses the name SU2 recognises |
+| `test_cd_nozzle.py` | `su2/geom/cd_nozzle.py`: wall profile (ends, throat, smoothness, cone angles, bad input) and gmsh mesh (cell counts, boundary markers, cell validity and skew, wall nodes on the profile, first wall cell); the lip-line relaxation (stations on axial nodes, bad keys rejected, same cell count, lip cell at the exit and outlet); `exit_cell_um` sets the axial cell either side of the exit plane; also that the capillary mesh still builds |
+| `test_mesh_quality.py` | `su2/mesh_quality.py`: square cells are perfect, known aspect ratio and size jump on a stretched grid, skewed-cell angles, the report's regions, lip and checks, triangles rejected |
+| `test_su2_config.py` | `su2/setup.py`: ideal choked mass flow, and the convergence settings (`CONV_FIELD= RMS_DENSITY` with a residual level, no Cauchy keys) |
+| `test_su2_coarsen.py` | mesh sequencing: `--coarsen` scales cell counts and sizes (minimum 2 cells, default throat cell), run directory names; `run_case.sh su2_refine` needs `FROM` and the coarse restart |
+| `test_remap_restart.py` | `su2/remap_restart.py`: binary restart round trip, linear fields interpolated exactly onto new nodes, non-binary files rejected |
 | `test_gases.py` | each SU2 gas has SPARTA data with matching IDs; R matches the molecular mass; SU2 viscosity matches VSS (he/ar near room temperature, d2 over 20–400 K, n2 over 50–400 K); D2 and N2 against measured viscosity; RotRel/VibRel are probabilities (1/Z) |
 | `test_capillary_massflow.py` | `lib/capillary.py` analytical capillary flow, and SU2 capillary mass flow against it |
 | `test_handoff.py` | `handoff/handoff.py`: automatic and forced coupling plane, errors when there is no breakdown or no room, reading `handoff.toml`; `run_case.sh` parses and refuses to start without `CASE` |
 | `test_sparta_inputs.py` | `sparta/setup.py` input generation: the hold, grid adaptation and averaging in the right order; hold images (size, zoom, only during the hold); continuation input (string checks, never runs SPARTA) |
+| `test_sparta_chamber.py` | `sparta/chamber.py`: outflow default leaves `in.sparta` unchanged; pump fraction ↔ chamber pressure balance; bad settings stop; reservoir composition and the renamed beam species; pump and reservoir commands in `in.sparta` and `in.continue`, per-species dump columns |
 | `test_inflow.py` | `sparta/inflow.py`: Maxwellian fluxes, plane mass flows, inflow file format; one opt-in test runs SPARTA on the inflow |
 | `plot_test_breakdown_gll.py` | not a test; one diagnostic plot per test in `test_breakdown_gll.py` |
 | `plots/` | output of the plot script |

@@ -1,0 +1,24 @@
+Mesh quality: runs/cd_n2_4kpa_0p125pa_coarse/su2/mesh.su2
+39800 quadrilaterals, 40561 nodes; lip at (0, 6.5) mm
+
+aspect ratio = longest / shortest edge; angle = interior corner angles (90 = square);
+size jump = largest area ratio to a neighbouring cell (1 = same size).
+
+region                           cells |      aspect ratio      | angle [deg] |  size jump 
+                                       | median     99%     max |   min   max |   99%   max
+all                              39800 |   7.97    1213    4341 |  67.9 112.1 |  1.43  2.06
+nozzle (x < 0 mm)                18800 |   5.76   401.3    1251 |  79.2 100.8 |   1.2  1.69
+chamber, r < lip (jet core)       6000 |     12    1314    3600 |  86.0  94.0 |  1.51  2.06
+chamber, r > lip                 15000 |   12.5    1798    4341 |  67.9 112.1 |  1.53  2.06
+
+Worst cells (x, r):
+  aspect ratio      4341 at (0.0005, 57.8) mm;  4091 at (0.00153, 57.8) mm;  3989 at (0.0005, 53.7) mm
+  size jump         2.06 at (86.6, 6.5) mm;  2.06 at (91.9, 6.49) mm;  2.06 at (86.6, 6.5) mm
+  angle off 90 deg  22.1 at (97.5, 24.4) mm;  22.1 at (91.9, 22.1) mm;  22.1 at (117, 33) mm
+
+Checks:
+  [!!] aspect ratio <= 1000: 539 cells above, worst 4341 at (0.0005, 57.8) mm
+  [ok] corner angles within 45-135 deg
+  [!!] size jump <= 1.5: 322 cells above, worst 2.06 at (86.6, 6.5) mm
+
+SU2 prints its own (dual control volume) quality table near the top of su2.log.

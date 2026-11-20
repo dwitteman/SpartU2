@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Build an SU2 run directory from a case file: mesh + config.
 
-Usage: python su2/setup.py [CASE.toml] [--runs RUNS_DIR]
+Usage: python su2/setup.py [CASE.toml] [--runs RUNS_DIR] [--coarsen N]
 Creates RUNS_DIR/<case name>/su2/ (CASE defaults to config.toml, RUNS_DIR to ./runs).
+--coarsen N builds an N-times coarser copy in RUNS_DIR/<case name>/su2_coarse<N>/ instead: a
+cheap first solution to start the full mesh from (run_case.sh stage su2_refine).
 """
 import argparse
+import copy
 import math
 import importlib
 import re
@@ -17,6 +20,7 @@ if __package__ in (None, ""):  # allow `python su2/setup.py` as well as `-m su2.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lib.common import die, fmt, get, load_case, log
+from su2 import mesh_quality
 
 # Continuum gas properties, keyed by the species file stem (sparta/data/<key>.species/.vss).
 # he, ar: Sutherland matched to the DSMC VSS viscosity at 273 K only. It is 16-60% low
@@ -72,19 +76,6 @@ def ideal_massflow(case: dict) -> float:
     area = math.pi * (get(case, "geometry", "throat_diam_mm") * 1e-3 / 2) ** 2
     p0, T0 = get(case, "gas", "plen_pres_pa"), get(case, "gas", "plen_temp_K")
     return p0 * area * math.sqrt(gam / (R * T0)) * (2 / (gam + 1)) ** ((gam + 1) / (2 * (gam - 1)))
-
-
-def massflow_cauchy_eps(case: dict) -> float:
-    """CONV_CAUCHY_EPS for CONV_FIELD= SURFACE_MASSFLOW, from [su2] conv_massflow_rel.
-
-    SU2 averages |change of the field per iteration| / max(|field|, 0.1) over CONV_CAUCHY_ELEMS
-    iterations. Mass flows here are far below 0.1 kg/s, so that is an absolute change / 0.1;
-    scaling eps with the ideal mass flow makes the test relative: converged when the mass flow
-    changes by less than conv_massflow_rel of itself per iteration (default 1e-6, i.e. ~1% per
-    10,000 iterations), whatever the case's flow rate."""
-    rel = float(get(case, "su2", "conv_massflow_rel", 1e-6))
-    mdot = ideal_massflow(case)
-    return rel * mdot / max(mdot, 0.1)
 
 
 def su2_config(case: dict, case_name: str) -> str:
@@ -192,8 +183,37 @@ SCREEN_WRT_FREQ_INNER= 50
 """
 
 
-def setup(case_path, runs_dir="runs") -> Path:
-    """Create runs_dir/<case name>/su2/ with mesh and su2.cfg. Returns the run dir."""
+# [su2] mesh keys scaled by --coarsen: cell counts are divided by N, cell sizes multiplied
+COUNT_KEYS = ("n_radial_tube", "n_axial_tube", "n_axial_conv", "n_axial_div", "n_axial_ext", "n_radial_ext")
+SIZE_KEYS = ("first_cell_um", "exit_cell_um", "throat_cell_um", "lip_relax_cell_um")
+
+
+def coarsen_case(case: dict, n: int) -> dict:
+    """A copy of the case with an n-times coarser mesh: every cell count / n (at least 2), every
+    cell size x n, so the grading and block layout match the full mesh."""
+    if n < 1:
+        die("--coarsen must be a positive integer")
+    case = copy.deepcopy(case)
+    s = case["su2"]
+    if case.get("geometry", {}).get("noz_type") == "cd_nozzle" and "throat_cell_um" not in s:
+        s["throat_cell_um"] = get(case, "geometry", "throat_diam_mm") * 1e3 / 40  # su2/geom default R_t/20
+    for k in COUNT_KEYS:
+        if k in s:
+            s[k] = max(2, round(s[k] / n))
+    for k in SIZE_KEYS:
+        if k in s:
+            s[k] = [v * n for v in s[k]] if isinstance(s[k], list) else s[k] * n
+    return case
+
+
+def run_dir_name(coarsen: int = 1) -> str:
+    """SU2 run directory name under runs/<case name>/: su2, or su2_coarse<N>."""
+    return "su2" if coarsen == 1 else f"su2_coarse{coarsen}"
+
+
+def setup(case_path, runs_dir="runs", coarsen=1) -> Path:
+    """Create runs_dir/<case name>/su2/ (su2_coarse<N>/ with coarsen=N) with mesh and su2.cfg.
+    Returns the run dir."""
     case_path = Path(case_path).resolve()
     case = load_case(case_path)
 
@@ -201,12 +221,20 @@ def setup(case_path, runs_dir="runs") -> Path:
     if (get(case, "geometry", "dim"), get(case, "geometry", "symmetry")) != (2, "axial"):
         die("only dim=2, symmetry=axial is implemented so far")
 
-    run_dir = Path(runs_dir) / name / "su2"
+    run_dir = Path(runs_dir) / name / run_dir_name(coarsen)
     run_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy(case_path, run_dir / "case.toml")  # provenance: run dir records its inputs
     log(f"case {name} -> {run_dir}")
+    if coarsen != 1:
+        case = coarsen_case(case, coarsen)
+        log(f"coarsened {coarsen}x: " + ", ".join(f"{k} = {case['su2'][k]}"
+                                                for k in COUNT_KEYS + SIZE_KEYS if k in case["su2"]))
 
     write_mesh(case, case_path, run_dir)
+    qfile, flagged = mesh_quality.write(run_dir / "mesh.su2")
+    for w in flagged:
+        log(f"WARNING: {w}")
+    log(f"wrote {qfile}")
     (run_dir / "su2.cfg").write_text(su2_config(case, case_path.name))
     log(f"wrote {run_dir / 'su2.cfg'}")
     return run_dir
@@ -216,8 +244,10 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("case", nargs="?", default="config.toml", help="case file (default: config.toml)")
     ap.add_argument("--runs", default="runs", help="runs directory (default: ./runs)")
+    ap.add_argument("--coarsen", type=int, default=1,
+                    help="build an N-times coarser mesh in su2_coarse<N>/ (default: 1, the full mesh)")
     args = ap.parse_args(argv)
-    setup(args.case, args.runs)
+    setup(args.case, args.runs, args.coarsen)
 
 
 if __name__ == "__main__":

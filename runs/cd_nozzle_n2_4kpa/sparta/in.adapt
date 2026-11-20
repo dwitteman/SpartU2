@@ -1,0 +1,55 @@
+# Hand-written (not generated): end the transient hold early from a restart file, adapt the
+# grid to the particles, then run with averaged output. Same settings as in.sparta/in.continue.
+#   mpirun -n N spa_mpi -in in.adapt -var file restart.450000.sparta -var target 520000 \
+#          -var seed 460007 -log log.adapt.sparta -screen none
+# Order: 1000 steps counting particles per cell -> adapt_grid -> unaveraged run up to step
+# `settle` (the coarsened/refined cells re-fill, and particle weights re-settle under
+# weight cell radius) -> averaged run up to `target`, dumps every 20000 steps.
+# Continue afterwards with in.continue as usual (it reads the newest restart).
+
+variable        file index restart.450000.sparta
+variable        target index 520000
+variable        settle index 460000
+variable        seed index 460007
+seed            ${seed}
+
+read_restart    ${file} balance rcb cell
+collide         vss gas n2.vss
+surf_collide    wall diffuse 300.15 1.0
+surf_modify     all collide wall
+fix             inflow emit/face/file gas xlo inflow.sparta XLO
+stats           2000
+stats_style     step cpu np nattempt ncoll
+fix             lb balance 4000 1.1 rcb part
+restart         50000 restart.*.sparta
+
+# ---- particle count per cell, averaged over 1000 steps ---------------------------------
+compute         hold_n grid all gas n
+fix             hold_n ave/grid all 1 1000 1000 c_hold_n[1]
+run             1000
+
+# ---- adapt the grid to the particles ----------------------------------------------------
+# refine cells holding > 80 particles, merge sibling cells holding < 20 in total.
+# Refinement stops at the cell-ID bit limit (cells already at the finest level stay);
+# new cells get 0 in the SU2 columns g_su2_nrho, g_lambda.
+adapt_grid      all refine coarsen value f_hold_n 80 20 combine sum
+unfix           hold_n
+uncompute       hold_n
+balance_grid    rcb part
+write_restart   restart.*.sparta     # restart.451000.sparta: the adapted grid
+
+# ---- let the flow settle on the new grid (no output) -----------------------------------
+run             ${settle} upto
+
+# ---- run with averaged output ------------------------------------------------------------
+# One step before the averaged output is defined: SPARTA always dumps on the first step of
+# a run that falls on a multiple of the dump interval, which would write an empty average.
+run             1
+
+compute         g grid all gas nrho massrho u v
+compute         th thermal/grid all gas temp
+fix             avg ave/grid all 1 10000 20000 c_g[*] c_th[*]
+dump            flow grid all 20000 flow.*.dump id xc yc f_avg[1] f_avg[2] f_avg[3] f_avg[4] f_avg[5] g_su2_nrho g_lambda
+
+run             ${target} upto
+write_restart   restart.*.sparta

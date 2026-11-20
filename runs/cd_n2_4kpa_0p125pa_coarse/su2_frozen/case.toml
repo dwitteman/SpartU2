@@ -1,9 +1,9 @@
-# Example case: conical converging-diverging nozzle, nitrogen, into the 5 x 2.5 cm chamber.
+# Example case: conical converging-diverging nozzle, nitrogen, into a chamber at .125 pa, viewing a 12x6cm region.
 # The nozzle dimensions are illustrative; replace them with the real nozzle.
 #   python su2/setup.py examples/cd_nozzle_d2.toml
 
 [case]
-name = "cd_nozzle_n2_4kpa"
+name = "cd_n2_4kpa_0p125pa_coarse"
 
 [geometry]
 noz_type = "cd_nozzle"
@@ -23,20 +23,24 @@ chamb_height_cm = 6.0
 [gas]
 species_file = "n2.species"
 plen_pres_pa = 4225
-plen_temp_K = 300.15
+plen_temp_K = 293.15
 
 [su2]
-back_pres_pa = 1000
-wall_temp_K = 300.15
+back_pres_pa = 0.125
+wall_temp_K = 293.15
 faceplate = "wall"
 first_cell_um = 1.0           # cell size at the wall, exit plane and lip
 throat_cell_um = 10.0         # axial cell size at the throat (default R_t/20)
 n_radial_tube = 40            # cells from wall to axis inside the nozzle
 n_axial_conv = 120            # inlet -> throat, clustered at the throat
 n_axial_div = 200             # throat -> exit, split in two blocks clustered at each end
-n_axial_ext = 300             # exit plane -> outlet
-n_radial_ext = 200            # lip -> chamber radius
-iterations = 25000
+n_axial_ext = 150             # exit plane -> outlet
+n_radial_ext = 100            # lip -> chamber radius
+# Coarsen the lip-line cell over the back half of the chamber: 1 um stretched to 3 mm axial
+# cells (aspect ratio ~3000) gave a spurious pressure ridge along the lip line at 0.125 Pa.
+lip_relax_x = [0.5, 0.75, 1.0]          # stations, fractions of the chamber length
+lip_relax_cell_um = [1.0, 10.0, 100.0]  # radial cell at the lip line at each station
+iterations = 250000
 
 [sparta]
 x_couple_D = "auto"           # couple_margin_D upstream of breakdown, inside the nozzle if it happens there; or a number of D from the exit
@@ -45,7 +49,7 @@ breakdown_module = "handoff.breakdown_2d"   # Boyd's full Kn_GLL over each plane
 base_grid = [200, 100]
 cells_per_mfp = 3
 ppc_target = 20
-hold_steps = 500000           # transient hold (~ one box transit) before averaging; then the grid adapts to the particles
+hold_steps = 450000           # transient hold (~ one box transit) before averaging; then the grid adapts to the particles
 run_steps = 20000             # averaged run after the hold
 output_every = 20000          # flow dump interval; must divide hold_steps and run_steps
 restart_every = 50000         # restart file interval

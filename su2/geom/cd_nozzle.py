@@ -11,7 +11,7 @@ The nozzle is split into structured blocks at stations along x:
   conv    inlet -> throat start     axial cells clustered at the throat
   throat  straight throat (if any)  uniform, ~throat_cell
   div1    throat end -> midpoint     clustered at the throat
-  div2    midpoint -> exit           clustered at the exit plane (first_cell)
+  div2    midpoint -> exit           clustered at the exit plane (exit_cell, default first_cell)
 then the chamber blocks A (r < R_e) and B (lip -> chamber radius), as in capillary.py:
 
   +------------------------------- top (outlet) -----------------+
@@ -142,12 +142,49 @@ class _Geo:
         return "\n".join(self.lines) + "\n"
 
 
+def chamber_stations(case: dict, Lx: float, h: float, nx_e: int, h_x: float = None) -> list:
+    """Chamber x stations and the radial first cell at the lip line at each: [(node, x, cell)].
+
+    [su2] lip_relax_x (fractions of the chamber length) and lip_relax_cell_um (cell size at each)
+    coarsen the lip-line cell downstream, where 1 um cells stretched to mm lengths are needlessly
+    anisotropic. Upstream of the first station the cell is first_cell_um; between stations it
+    changes smoothly (gmsh's transfinite interpolation); past the last it stays constant. Each
+    station is moved to the nearest node of the axial distribution, so the axial cells are
+    unchanged. Without the keys there is one chamber block, first_cell_um everywhere.
+    h is the lip-line cell at the exit plane, h_x the first axial cell (default h).
+    """
+    h_x = h if h_x is None else h_x
+    fr = get(case, "su2", "lip_relax_x", [])
+    cells = get(case, "su2", "lip_relax_cell_um", [])
+    if len(fr) != len(cells):
+        die("su2.lip_relax_x and su2.lip_relax_cell_um need the same number of entries")
+    if any(not 0 < f <= 1 for f in fr) or list(fr) != sorted(set(fr)):
+        die("su2.lip_relax_x must be increasing fractions of the chamber length in (0, 1]")
+    if any(c <= 0 for c in cells):
+        die("su2.lip_relax_cell_um must be positive")
+    g = growth_rate(Lx, nx_e, h_x)
+    i = np.arange(nx_e + 1)
+    xn = i * 1.0 if g == 1.0 else (g**i - 1) / (g - 1)
+    xn = Lx * xn / xn[-1]  # the axial node positions gmsh will produce
+    st = [(0, 0.0, h)]
+    for f, c in zip(fr, cells):
+        k = int(np.argmin(np.abs(xn - f * Lx)))
+        if k <= st[-1][0]:
+            die(f"su2.lip_relax_x = {f} lands on the same chamber node as the station before it; "
+                f"spread the stations out or raise n_axial_ext")
+        st.append((k, float(xn[k]), c * 1e-6))
+    if st[-1][0] < nx_e:
+        st.append((nx_e, Lx, st[-1][2]))
+    return st
+
+
 def geo(case: dict, source: str = "") -> str:
     """Return the .geo file text for this case. `source` is noted in the header."""
     p = profile(case)
     Lx = get(case, "geometry", "chamb_length_cm") * 1e-2
     Rext = get(case, "geometry", "chamb_height_cm") * 1e-2
     h = get(case, "su2", "first_cell_um") * 1e-6
+    h_x = get(case, "su2", "exit_cell_um", h * 1e6) * 1e-6  # axial cell either side of the exit plane
     h_t = get(case, "su2", "throat_cell_um", p.R_t / 20 * 1e6) * 1e-6
     nr = get(case, "su2", "n_radial_tube")
     nx_c = get(case, "su2", "n_axial_conv")
@@ -164,7 +201,7 @@ def geo(case: dict, source: str = "") -> str:
     blocks = [(p.x_in, p.x_tu, nx_c, "end", h_t)]
     if p.L_t > 0:
         blocks.append((p.x_tu, p.x_td, max(1, round(p.L_t / h_t)), "none", None))
-    blocks += [(p.x_td, x_mid, nx_d // 2, "start", h_t), (x_mid, 0.0, nx_d - nx_d // 2, "end", h)]
+    blocks += [(p.x_td, x_mid, nx_d // 2, "start", h_t), (x_mid, 0.0, nx_d - nx_d // 2, "end", h_x)]
     stations = [b[0] for b in blocks] + [0.0]
 
     G = _Geo()
@@ -202,30 +239,42 @@ def geo(case: dict, source: str = "") -> str:
         wall_c.append(cw)
         surfaces.append(k + 1)
 
-    # chamber: block A (axis .. lip radius) and block B (lip .. chamber radius)
-    P2, P6 = axis_pts[-1], wall_pts[-1]
-    P3, P8 = G.point(Lx, 0), G.point(Lx, p.R_e)
-    P4, P5 = G.point(Lx, Rext), G.point(0, Rext)
-    g_xe = growth_rate(Lx, nx_e, h)
-    g_re = growth_rate(Rext - p.R_e, nr_e, h)
-    c_ax = G.line(P2, P3, "axis, chamber")
-    c_lip = G.line(P6, P8, "lip line extension")
-    c_out_lo = G.line(P8, P3, "outlet, lower")
-    c_face = G.line(P6, P5, "faceplate")
-    c_out_up = G.line(P8, P4, "outlet, upper")
-    c_top = G.line(P5, P4, "top")
-    G.transfinite(f"{c_out_lo}", nr, growth_rate(p.R_e, nr, h))
-    for c in (c_ax, c_lip, c_top):
-        G.transfinite(c, nx_e, g_xe)
-    for c in (c_face, c_out_up):
-        G.transfinite(c, nr_e, g_re)
-    nA, nB = len(blocks) + 1, len(blocks) + 2
-    exit_line = radial[-1]
-    G.lines.append(f"Curve Loop({nA}) = {{{c_ax}, {-c_out_lo}, {-c_lip}, {exit_line}}};")
-    G.lines.append(f"Plane Surface({nA}) = {{{nA}}};")
-    G.lines.append(f"Curve Loop({nB}) = {{{c_lip}, {c_out_up}, {-c_top}, {-c_face}}};")
-    G.lines.append(f"Plane Surface({nB}) = {{{nB}}};")
-    surfaces += [nA, nB]
+    # chamber: blocks A (axis .. lip radius) and B (lip .. chamber radius), split along x at
+    # the lip_relax stations; the radial first cell at the lip line can grow at each station
+    st = chamber_stations(case, Lx, h, nx_e, h_x)
+    g_xe = growth_rate(Lx, nx_e, h_x)
+    ax_p, lip_p, top_p = [axis_pts[-1]], [wall_pts[-1]], [G.point(0, Rext)]
+    for _, x, _ in st[1:]:
+        ax_p.append(G.point(x, 0))
+        lip_p.append(G.point(x, p.R_e))
+        top_p.append(G.point(x, Rext))
+    last = len(st) - 1
+    lo, up = [radial[-1]], []  # radial lines at each station: lip -> axis (A), lip -> top (B)
+    for k, (_, x, h_lip) in enumerate(st):
+        if k > 0:
+            c = G.line(lip_p[k], ax_p[k], "outlet, lower" if k == last else "chamber station")
+            G.transfinite(c, nr, growth_rate(p.R_e, nr, h_lip))
+            lo.append(c)
+        c = G.line(lip_p[k], top_p[k],
+                   "faceplate" if k == 0 else ("outlet, upper" if k == last else "chamber station"))
+        G.transfinite(c, nr_e, growth_rate(Rext - p.R_e, nr_e, h_lip))
+        up.append(c)
+    ax_c, top_c = [], []
+    for k in range(last):
+        n = st[k + 1][0] - st[k][0]
+        c_ax = G.line(ax_p[k], ax_p[k + 1], "axis, chamber")
+        c_lip = G.line(lip_p[k], lip_p[k + 1], "lip line extension")
+        c_top = G.line(top_p[k], top_p[k + 1], "top")
+        for c in (c_ax, c_lip, c_top):
+            G.transfinite(c, n, g_xe)
+        nA, nB = len(surfaces) + 1, len(surfaces) + 2
+        G.lines.append(f"Curve Loop({nA}) = {{{c_ax}, {-lo[k + 1]}, {-c_lip}, {lo[k]}}};")
+        G.lines.append(f"Plane Surface({nA}) = {{{nA}}};")
+        G.lines.append(f"Curve Loop({nB}) = {{{c_lip}, {up[k + 1]}, {-c_top}, {-up[k]}}};")
+        G.lines.append(f"Plane Surface({nB}) = {{{nB}}};")
+        surfaces += [nA, nB]
+        ax_c.append(c_ax)
+        top_c.append(c_top)
 
     sl = ", ".join(map(str, surfaces))
     join = lambda cs: ", ".join(map(str, cs))  # noqa: E731
@@ -235,9 +284,9 @@ def geo(case: dict, source: str = "") -> str:
         "",
         f'Physical Curve("inlet") = {{{radial[0]}}};',
         f'Physical Curve("wall") = {{{join(wall_c)}}};',
-        f'Physical Curve("faceplate") = {{{c_face}}};',
-        f'Physical Curve("axis") = {{{join(axis_c + [c_ax])}}};',
-        f'Physical Curve("outlet") = {{{join([c_out_lo, c_out_up, c_top])}}};',
+        f'Physical Curve("faceplate") = {{{up[0]}}};',
+        f'Physical Curve("axis") = {{{join(axis_c + ax_c)}}};',
+        f'Physical Curve("outlet") = {{{join([lo[-1], up[-1]] + top_c)}}};',
         f'Physical Surface("fluid") = {{{sl}}};',
     ]
     head = [
@@ -245,7 +294,10 @@ def geo(case: dict, source: str = "") -> str:
         f"// conical CD nozzle: D_in = {fmt(2*p.R_in)} m, D_t = {fmt(2*p.R_t)} m, D_e = {fmt(2*p.R_e)} m, "
         f"A_e/A_t = {p.area_ratio:.4g}, length {fmt(p.length)} m",
         f"// throat rc = {fmt(p.rc)} m, straight throat {fmt(p.L_t)} m; domain {fmt(Lx)} x {fmt(Rext)} m",
-        f"// first cell {fmt(h)} m (wall, exit, lip), throat axial cell {fmt(h_t)} m",
+        f"// first cell {fmt(h)} m (wall, lip), axial cell at the exit plane {fmt(h_x)} m, "
+        f"throat axial cell {fmt(h_t)} m",
+        "// lip-line first cell along the chamber: "
+        + ", ".join(f"{fmt(h_lip)} m at x = {fmt(x)} m" for _, x, h_lip in st),
         "",
     ]
     return "\n".join(head) + G.text()

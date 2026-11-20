@@ -94,6 +94,7 @@ CASE=my_case.toml STAGES="su2_setup su2" NP=8 bash run_case.sh
 | `su2_setup` | `python su2/setup.py CASE` | `runs/<name>/su2/`: mesh, `su2.cfg` |
 | `su2` | `mpirun SU2_CFD su2.cfg` from the initial state | `flow.vtu`, `restart_flow.dat`, `history.csv`, `su2.log` |
 | `su2_restart` | the same from `restart_flow.dat`; earlier results copied to `su2/archive/<n>/` | |
+| `su2_refine` | the same from a coarser run's solution (`FROM=N`, `su2_coarse<N>/`), interpolated onto this mesh | |
 | `handoff` | `python handoff/handoff.py CASE` | `runs/<name>/handoff/`: `handoff.toml`, `inflow.sparta`, `report.txt`/`.png` |
 | `sparta_setup` | `python sparta/setup.py CASE` | `runs/<name>/sparta/`: grid, `in.sparta`, `in.continue`, `setup.log` |
 | `sparta` | `mpirun spa_mpi -in in.sparta` | `log.sparta`, `flow.<step>.dump`, `restart.<step>.sparta` |
@@ -102,6 +103,8 @@ CASE=my_case.toml STAGES="su2_setup su2" NP=8 bash run_case.sh
 Each line of the table is a single command, so a failed stage can be rerun by hand with
 the command in the second column. The script stops at the first failing stage. Its header
 lists the settings: `NP`, `MPIRUN`, `SU2_ITER`, `TARGET`, `RUNS` and the executable names.
+`COARSEN=N` runs the SU2 stages on an N-times coarser mesh in `su2_coarse<N>/`, to start
+the full mesh from with `su2_refine` ([su2/README.md](su2/README.md#starting-from-a-coarse-mesh)).
 For a PBS job, set the cores and walltime in the `#PBS` lines (Torque syntax, with the
 PBS Pro form in a comment).
 
